@@ -1,0 +1,26 @@
+# Copyright (c) 2022 STMicroelectronics
+# SPDX-License-Identifier: Apache-2.0
+
+description: STM32 family VDDA node
+
+include: base.yaml
+
+compatible: "st,stm32-vdda"
+
+properties:
+    io-channels:
+      required: true
+      description: ADC channel for Vbat sensor
+
+    ratio:
+      type: int
+      required: false
+      description: fraction of VBat to be connected to the ADC input
+
+    vref-addr:
+      type: int
+      required: true
+
+    analog-value:
+      type: int
+      required: true

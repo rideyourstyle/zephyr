@@ -412,6 +412,14 @@
 		io-channels = <&adc1 16>;
 		status = "disabled";
 	};
+
+	stm32_vdda: stmvdda {
+		compatible = "st,stm32-vdda";
+		io-channels = <&adc1 17>;
+		vref-addr = <0x1FF800F8>;
+		analog-value = <3000>;
+		status = "disabled";
+	};
 };
 
 &nvic {
