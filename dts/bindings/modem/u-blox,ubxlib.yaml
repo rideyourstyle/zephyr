@@ -1,0 +1,21 @@
+# Copyright (c) 2019, Foundries.io
+# SPDX-License-Identifier: Apache-2.0
+
+description: u-blox ubxlib modem
+
+compatible: "u-blox,ubxlib"
+
+include: uart-device.yaml
+
+properties:
+    mdm-power-gpios:
+      type: phandle-array
+      required: true
+
+    mdm-reset-gpios:
+      type: phandle-array
+      required: false
+
+    mdm-vint-gpios:
+      type: phandle-array
+      required: false
