@@ -14,6 +14,7 @@ config MODEM_UBLOX_UBXLIB
 	help
 	  Choose this setting to enable u-blox ubxlib modem driver.
 
+
 if MODEM_UBLOX_UBXLIB
 
 config MODEM_UBLOX_UBXLIB_RX_STACK_SIZE
