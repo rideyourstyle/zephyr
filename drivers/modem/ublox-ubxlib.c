@@ -71,7 +71,7 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 #define MDM_RESET_NOT_ASSERTED 1
 #define MDM_RESET_ASSERTED     0
 
-#define MDM_NET_CONNECT_TIMEOUT_SECONDS (60 * 1)
+#define MDM_NET_CONNECT_TIMEOUT_SECONDS (180 * 1)
 
 #define MDM_CMD_TIMEOUT		 K_SECONDS(10)
 #define MDM_DNS_TIMEOUT		 K_SECONDS(70)
@@ -189,109 +189,6 @@ static struct sockaddr result_addr;
 static char result_canonname[DNS_MAX_NAME_SIZE + 1];
 #endif
 
-/* helper macro to keep readability */
-#define ATOI(s_, value_, desc_) modem_atoi(s_, value_, desc_, __func__)
-
-/**
- * @brief  Convert string to long integer, but handle errors
- *
- * @param  s: string with representation of integer number
- * @param  err_value: on error return this value instead
- * @param  desc: name the string being converted
- * @param  func: function where this is called (typically __func__)
- *
- * @retval return integer conversion on success, or err_value on error
- */
-static int modem_atoi(const char *s, const int err_value, const char *desc, const char *func)
-{
-	int ret;
-	char *endptr;
-
-	ret = (int)strtol(s, &endptr, 10);
-	if (!endptr || *endptr != '\0') {
-		uPortLog("bad %s '%s' in %s", s, desc, func);
-		return err_value;
-	}
-
-	return ret;
-}
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-/* the list of SIM profiles. Global scope, so the app can change it */
-const char *modem_sim_profiles = CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN_PROFILES;
-
-int find_apn(char *apn, int apnlen, const char *profiles, const char *imsi)
-{
-	int rc = -1;
-
-	/* try to find a match */
-	char *s = strstr(profiles, imsi);
-
-	if (s) {
-		char *eos;
-
-		/* find the assignment operator preceding the match */
-		while (s >= profiles && !strchr("=", *s)) {
-			s--;
-		}
-		/* find the apn preceding the assignment operator */
-		while (s >= profiles && strchr(" =", *s)) {
-			s--;
-		}
-
-		/* mark end of apn string */
-		eos = s + 1;
-
-		/* find first character of the apn */
-		while (s >= profiles && !strchr(" ,", *s)) {
-			s--;
-		}
-		s++;
-
-		/* copy the key */
-		if (s >= profiles) {
-			int len = eos - s;
-
-			if (len < apnlen) {
-				memcpy(apn, s, len);
-				apn[len] = '\0';
-				rc = 0;
-			} else {
-				uPortLog("buffer overflow");
-			}
-		}
-	}
-
-	return rc;
-}
-
-/* try to detect APN automatically, based on IMSI */
-int modem_detect_apn(const char *imsi)
-{
-	int rc = -1;
-
-	if (imsi != NULL && strlen(imsi) >= 5) {
-
-		/* extract MMC and MNC from IMSI */
-		char mmcmnc[6];
-		*mmcmnc = 0;
-		strncat(mmcmnc, imsi, sizeof(mmcmnc) - 1);
-
-		/* try to find a matching IMSI, and assign the APN */
-		rc = find_apn(mdata.mdm_apn, sizeof(mdata.mdm_apn), modem_sim_profiles, mmcmnc);
-		if (rc < 0) {
-			rc = find_apn(mdata.mdm_apn, sizeof(mdata.mdm_apn), modem_sim_profiles,
-				      "*");
-		}
-	}
-
-	if (rc == 0) {
-		uPortLog("Assign APN: \"%s\"", mdata.mdm_apn);
-	}
-
-	return rc;
-}
-#endif
 
 /* send binary data via the +USO[ST/WR] commands */
 static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t timeout)
@@ -441,445 +338,9 @@ exit:
 }
 #endif
 
-/*
- * Modem Response Command Handlers
- */
-
-/* Handler: OK */
-// MODEM_CMD_DEFINE(on_cmd_ok)
-//{
-//	modem_cmd_handler_set_error(data, 0);
-//	k_sem_give(&mdata.sem_response);
-//	return 0;
-// }
-
-/* Handler: @ */
-// MODEM_CMD_DEFINE(on_prompt)
-//{
-//	k_sem_give(&mdata.sem_prompt);
-//
-//	/* A direct cmd should return the number of byte processed.
-//	 * Therefore, here we always return 1
-//	 */
-//	return 1;
-// }
-
-/* Handler: ERROR */
-// MODEM_CMD_DEFINE(on_cmd_error)
-//{
-//	modem_cmd_handler_set_error(data, -EIO);
-//	k_sem_give(&mdata.sem_response);
-//	return 0;
-// }
-
-/* Handler: +CME Error: <err>[0] */
-// MODEM_CMD_DEFINE(on_cmd_exterror)
-//{
-//	/* TODO: map extended error codes to values */
-//	modem_cmd_handler_set_error(data, -EIO);
-//	k_sem_give(&mdata.sem_response);
-//	return 0;
-// }
-
-/*
- * Modem Info Command Handlers
- */
-
-/* Handler: <manufacturer> */
-// MODEM_CMD_DEFINE(on_cmd_atcmdinfo_manufacturer)
-//{
-//	size_t out_len;
-//
-//	out_len = net_buf_linearize(mdata.mdm_manufacturer,
-//				    sizeof(mdata.mdm_manufacturer) - 1,
-//				    data->rx_buf, 0, len);
-//	mdata.mdm_manufacturer[out_len] = '\0';
-//	uPortLog("Manufacturer: %s", mdata.mdm_manufacturer);
-//	return 0;
-// }
-
-/* Handler: <model> */
-// MODEM_CMD_DEFINE(on_cmd_atcmdinfo_model)
-//{
-//	size_t out_len;
-//
-//	out_len = net_buf_linearize(mdata.mdm_model,
-//				    sizeof(mdata.mdm_model) - 1,
-//				    data->rx_buf, 0, len);
-//	mdata.mdm_model[out_len] = '\0';
-//	uPortLog("Model: %s", mdata.mdm_model);
-//
-//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-//	/* Set modem type */
-//	if (strstr(mdata.mdm_model, "R4")) {
-//		mdata.mdm_variant = MDM_VARIANT_UBLOX_R4;
-//	} else {
-//		if (strstr(mdata.mdm_model, "U2")) {
-//			mdata.mdm_variant = MDM_VARIANT_UBLOX_U2;
-//		}
-//	}
-//	uPortLog("Variant: %d", mdata.mdm_variant);
-//#endif
-//
-//	return 0;
-// }
-
-/* Handler: <rev> */
-// MODEM_CMD_DEFINE(on_cmd_atcmdinfo_revision)
-//{
-//	size_t out_len;
-//
-//	out_len = net_buf_linearize(mdata.mdm_revision,
-//				    sizeof(mdata.mdm_revision) - 1,
-//				    data->rx_buf, 0, len);
-//	mdata.mdm_revision[out_len] = '\0';
-//	uPortLog("Revision: %s", mdata.mdm_revision);
-//	return 0;
-// }
-
-/* Handler: <IMEI> */
-// MODEM_CMD_DEFINE(on_cmd_atcmdinfo_imei)
-//{
-//	size_t out_len;
-//
-//	out_len = net_buf_linearize(mdata.mdm_imei, sizeof(mdata.mdm_imei) - 1,
-//				    data->rx_buf, 0, len);
-//	mdata.mdm_imei[out_len] = '\0';
-//	uPortLog("IMEI: %s", mdata.mdm_imei);
-//	return 0;
-// }
-
-/* Handler: <IMSI> */
-// MODEM_CMD_DEFINE(on_cmd_atcmdinfo_imsi)
-//{
-//	size_t out_len;
-//
-//	out_len = net_buf_linearize(mdata.mdm_imsi, sizeof(mdata.mdm_imsi) - 1,
-//				    data->rx_buf, 0, len);
-//	mdata.mdm_imsi[out_len] = '\0';
-//	uPortLog("IMSI: %s", mdata.mdm_imsi);
-//
-//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-//	/* set the APN automatically */
-//	modem_detect_apn(mdata.mdm_imsi);
-//#endif
-//
-//	return 0;
-// }
-
-//#if !defined(CONFIG_MODEM_UBLOX_SARA_U2)
-///*
-// * Handler: +CESQ: <rxlev>[0],<ber>[1],<rscp>[2],<ecn0>[3],<rsrq>[4],<rsrp>[5]
-// */
-// MODEM_CMD_DEFINE(on_cmd_atcmdinfo_rssi_cesq)
-//{
-//	int rsrp, rxlev;
-//
-//	rsrp = ATOI(argv[5], 0, "rsrp");
-//	rxlev = ATOI(argv[0], 0, "rxlev");
-//	if (rsrp >= 0 && rsrp <= 97) {
-//		mdata.mdm_rssi = -140 + (rsrp - 1);
-//		uPortLog("RSRP: %d", mdata.mdm_rssi);
-//	} else if (rxlev >= 0 && rxlev <= 63) {
-//		mdata.mdm_rssi = -110 + (rxlev - 1);
-//		uPortLog("RSSI: %d", mdata.mdm_rssi);
-//	} else {
-//		mdata.mdm_rssi = -1000;
-//		uPortLog("RSRP/RSSI not known");
-//	}
-//
-//	return 0;
-//}
-//#endif
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_U2) || defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-/* Handler: +CSQ: <signal_power>[0],<qual>[1] */
-MODEM_CMD_DEFINE(on_cmd_atcmdinfo_rssi_csq)
-{
-	int rssi;
-
-	rssi = ATOI(argv[0], 0, "signal_power");
-	if (rssi == 31) {
-		mdata.mdm_rssi = -46;
-	} else if (rssi >= 0 && rssi <= 31) {
-		/* FIXME: This value depends on the RAT */
-		mdata.mdm_rssi = -110 + ((rssi * 2) + 1);
-	} else {
-		mdata.mdm_rssi = -1000;
-	}
-
-	uPortLog("RSSI: %d", mdata.mdm_rssi);
-	return 0;
-}
-#endif
-
-#if defined(CONFIG_MODEM_CELL_INFO)
-static int unquoted_atoi(const char *s, int base)
-{
-	if (*s == '"') {
-		s++;
-	}
-
-	return strtol(s, NULL, base);
-}
-
-/*
- * Handler: +COPS: <mode>[0],<format>[1],<oper>[2]
- */
-MODEM_CMD_DEFINE(on_cmd_atcmdinfo_cops)
-{
-	if (argc >= 3) {
-		mctx.data_operator = unquoted_atoi(argv[2], 10);
-		uPortLog("operator: %u", mctx.data_operator);
-	}
-
-	return 0;
-}
-
-/*
- * Handler: +CEREG: <n>[0],<stat>[1],<tac>[2],<ci>[3],<AcT>[4]
- */
-MODEM_CMD_DEFINE(on_cmd_atcmdinfo_cereg)
-{
-	if (argc >= 4) {
-		mctx.data_lac = unquoted_atoi(argv[2], 16);
-		mctx.data_cellid = unquoted_atoi(argv[3], 16);
-		uPortLog("lac: %u, cellid: %u", mctx.data_lac, mctx.data_cellid);
-	}
-
-	return 0;
-}
-
-static const struct setup_cmd query_cellinfo_cmds[] = {
-	SETUP_CMD_NOHANDLE("AT+CEREG=2"),
-	SETUP_CMD("AT+CEREG?", "", on_cmd_atcmdinfo_cereg, 5U, ","),
-	SETUP_CMD_NOHANDLE("AT+COPS=3,2"),
-	SETUP_CMD("AT+COPS?", "", on_cmd_atcmdinfo_cops, 3U, ","),
-};
-#endif /* CONFIG_MODEM_CELL_INFO */
-
-/*
- * Modem Socket Command Handlers
- */
-
-/* Handler: +USOCR: <socket_id>[0] */
-// MODEM_CMD_DEFINE(on_cmd_sockcreate)
-//{
-//	struct modem_socket *sock = NULL;
-//
-//	/* look up new socket by special id */
-//	sock = modem_socket_from_newid(&mdata.socket_config);
-//	if (sock) {
-//		sock->id = ATOI(argv[0],
-//				mdata.socket_config.base_socket_num - 1,
-//				"socket_id");
-//		/* on error give up modem socket */
-//		if (sock->id == mdata.socket_config.base_socket_num - 1) {
-//			modem_socket_put(&mdata.socket_config, sock->sock_fd);
-//		}
-//	}
-//
-//	/* don't give back semaphore -- OK to follow */
-//	return 0;
-// }
-
-/* Handler: +USO[WR|ST]: <socket_id>[0],<length>[1] */
-// MODEM_CMD_DEFINE(on_cmd_sockwrite)
-//{
-//	mdata.sock_written = ATOI(argv[1], 0, "length");
-//	LOG_DBG("bytes written: %d", mdata.sock_written);
-//	return 0;
-// }
-
-#if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
-/* Handler: +USECMNG: 0,<type>[0],<internal_name>[1],<md5_string>[2] */
-MODEM_CMD_DEFINE(on_cmd_cert_write)
-{
-	uPortLog("cert md5: %s", argv[2]);
-	return 0;
-}
-#endif
-
-/* Common code for +USOR[D|F]: "<data>" */
-// static int on_cmd_sockread_common(int socket_id,
-//				  struct modem_cmd_handler_data *data,
-//				  int socket_data_length, uint16_t len)
-//{
-//	struct modem_socket *sock = NULL;
-//	struct socket_read_data *sock_data;
-//	int ret;
-//
-//	if (!len) {
-//		uPortLog("Short +USOR[D|F] value.  Aborting!");
-//		return -EAGAIN;
-//	}
-//
-//	/*
-//	 * make sure we still have buf data and next char in the buffer is a
-//	 * quote.
-//	 */
-//	if (!data->rx_buf || *data->rx_buf->data != '\"') {
-//		uPortLog("Incorrect format! Ignoring data!");
-//		return -EINVAL;
-//	}
-//
-//	/* zero length */
-//	if (socket_data_length <= 0) {
-//		uPortLog("Length problem (%d).  Aborting!", socket_data_length);
-//		return -EAGAIN;
-//	}
-//
-//	/* check to make sure we have all of the data (minus quotes) */
-//	if ((net_buf_frags_len(data->rx_buf) - 2) < socket_data_length) {
-//		LOG_DBG("Not enough data -- wait!");
-//		return -EAGAIN;
-//	}
-//
-//	/* skip quote */
-//	len--;
-//	net_buf_pull_u8(data->rx_buf);
-//	if (!data->rx_buf->len) {
-//		data->rx_buf = net_buf_frag_del(NULL, data->rx_buf);
-//	}
-//
-//	sock = modem_socket_from_id(&mdata.socket_config, socket_id);
-//	if (!sock) {
-//		uPortLog("Socket not found! (%d)", socket_id);
-//		ret = -EINVAL;
-//		goto exit;
-//	}
-//
-//	sock_data = (struct socket_read_data *)sock->data;
-//	if (!sock_data) {
-//		uPortLog("Socket data not found! Skip handling (%d)", socket_id);
-//		ret = -EINVAL;
-//		goto exit;
-//	}
-//
-//	ret = net_buf_linearize(sock_data->recv_buf, sock_data->recv_buf_len,
-//				data->rx_buf, 0, (uint16_t)socket_data_length);
-//	data->rx_buf = net_buf_skip(data->rx_buf, ret);
-//	sock_data->recv_read_len = ret;
-//	if (ret != socket_data_length) {
-//		uPortLog("Total copied data is different then received data!"
-//			" copied:%d vs. received:%d", ret, socket_data_length);
-//		ret = -EINVAL;
-//	}
-//
-// exit:
-//	/* remove packet from list (ignore errors) */
-//	(void)modem_socket_packet_size_update(&mdata.socket_config, sock,
-//					      -socket_data_length);
-//
-//	/* don't give back semaphore -- OK to follow */
-//	return ret;
-// }
-
-/*
- * Handler: +USORF: <socket_id>[0],<remote_ip_addr>[1],<remote_port>[2],
- *          <length>[3],"<data>"
- */
-// MODEM_CMD_DEFINE(on_cmd_sockreadfrom)
-//{
-//	/* TODO: handle remote_ip_addr */
-//
-//	return on_cmd_sockread_common(ATOI(argv[0], 0, "socket_id"), data,
-//				      ATOI(argv[3], 0, "length"), len);
-// }
-
-/* Handler: +USORD: <socket_id>[0],<length>[1],"<data>" */
-// MODEM_CMD_DEFINE(on_cmd_sockread)
-//{
-//	return on_cmd_sockread_common(ATOI(argv[0], 0, "socket_id"), data,
-//				      ATOI(argv[1], 0, "length"), len);
-// }
-
-//#if defined(CONFIG_DNS_RESOLVER)
-///* Handler: +UDNSRN: "<resolved_ip_address>"[0], "<resolved_ip_address>"[1] */
-// MODEM_CMD_DEFINE(on_cmd_dns)
-//{
-//	/* chop off end quote */
-//	argv[0][strlen(argv[0]) - 1] = '\0';
-//
-//	/* FIXME: Hard-code DNS on SARA-R4 to return IPv4 */
-//	result_addr.sa_family = AF_INET;
-//	/* skip beginning quote when parsing */
-//	(void)net_addr_pton(result.ai_family, &argv[0][1],
-//			    &((struct sockaddr_in *)&result_addr)->sin_addr);
-//	return 0;
-// }
-//#endif
-
-/*
- * MODEM UNSOLICITED NOTIFICATION HANDLERS
- */
-
-/* Handler: +UUSOCL: <socket_id>[0] */
-// MODEM_CMD_DEFINE(on_cmd_socknotifyclose)
-//{
-//	struct modem_socket *sock;
-//
-//	sock = modem_socket_from_id(&mdata.socket_config,
-//				    ATOI(argv[0], 0, "socket_id"));
-//	if (sock) {
-//		sock->is_connected = false;
-//	}
-//
-//	return 0;
-// }
-
-/* Handler: +UUSOR[D|F]: <socket_id>[0],<length>[1] */
-// MODEM_CMD_DEFINE(on_cmd_socknotifydata)
-//{
-//	int ret, socket_id, new_total;
-//	struct modem_socket *sock;
-//
-//	socket_id = ATOI(argv[0], 0, "socket_id");
-//	new_total = ATOI(argv[1], 0, "length");
-//	sock = modem_socket_from_id(&mdata.socket_config, socket_id);
-//	if (!sock) {
-//		return 0;
-//	}
-//
-//	ret = modem_socket_packet_size_update(&mdata.socket_config, sock,
-//					      new_total);
-//	if (ret < 0) {
-//		uPortLog("socket_id:%d left_bytes:%d err: %d", socket_id,
-//			new_total, ret);
-//	}
-//
-//	if (new_total > 0) {
-//		modem_socket_data_ready(&mdata.socket_config, sock);
-//	}
-//
-//	return 0;
-// }
-
-/* Handler: +CREG: <stat>[0] */
-// MODEM_CMD_DEFINE(on_cmd_socknotifycreg)
-//{
-//	mdata.ev_creg = ATOI(argv[0], 0, "stat");
-//	LOG_DBG("CREG:%d", mdata.ev_creg);
-//	return 0;
-// }
-
-/* RX thread
-static void modem_rx(void)
-{
-	while (true) {
-		// wait for incoming data
-		k_sem_take(&mdata.iface_data.rx_sem, K_FOREVER);
-
-		mctx.cmd_handler.process(&mctx.cmd_handler, &mctx.iface);
-
-		// give up time if we have a solid stream of data
-		k_yield();
-	}
-} */
-
 static int pin_init(void)
 {
-	uPortLog("Setting Modem Pins");
+	LOG_INF("Setting Modem Pins");
 	//  TODO: finish me...
 	//#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
 	//	LOG_DBG("MDM_RESET_PIN -> NOT_ASSERTED");
@@ -947,98 +408,10 @@ static int pin_init(void)
 	//
 	//	gpio_pin_configure_dt(&power_gpio, GPIO_INPUT);
 
-	uPortLog("... Done!");
+	LOG_INF("... Done!");
 
 	return 0;
 }
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-static void modem_rssi_query_work(struct k_work *work)
-{
-	static const struct modem_cmd cmds[] = {
-		MODEM_CMD("+CSQ: ", on_cmd_atcmdinfo_rssi_csq, 2U, ","),
-		MODEM_CMD("+CESQ: ", on_cmd_atcmdinfo_rssi_cesq, 6U, ","),
-	};
-	const char *send_cmd_u2 = "AT+CSQ";
-	const char *send_cmd_r4 = "AT+CESQ";
-	int ret;
-
-	/* choose cmd according to variant */
-	const char *send_cmd = send_cmd_r4;
-
-	if (mdata.mdm_variant == MDM_VARIANT_UBLOX_U2) {
-		send_cmd = send_cmd_u2;
-	}
-
-	/* query modem RSSI */
-	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, cmds, ARRAY_SIZE(cmds), send_cmd,
-			     &mdata.sem_response, MDM_CMD_TIMEOUT);
-	if (ret < 0) {
-		uPortLog("AT+C[E]SQ ret:%d", ret);
-	}
-
-#if defined(CONFIG_MODEM_CELL_INFO)
-	/* query cell info */
-	ret = modem_cmd_handler_setup_cmds_nolock(
-		&mctx.iface, &mctx.cmd_handler, query_cellinfo_cmds,
-		ARRAY_SIZE(query_cellinfo_cmds), &mdata.sem_response, MDM_CMD_TIMEOUT);
-	if (ret < 0) {
-		uPortLog("modem query for cell info returned %d", ret);
-	}
-#endif
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-	/* re-start RSSI query work */
-	if (work) {
-		k_work_reschedule_for_queue(&modem_workq, &mdata.rssi_query_work,
-					    K_SECONDS(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK_PERIOD));
-	}
-#endif
-}
-#else
-// static void modem_rssi_query_work(struct k_work *work)
-//{
-//	static const struct modem_cmd cmd =
-//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
-//		MODEM_CMD("+CSQ: ", on_cmd_atcmdinfo_rssi_csq, 2U, ",");
-//	static char *send_cmd = "AT+CSQ";
-//#else
-//		MODEM_CMD("+CESQ: ", on_cmd_atcmdinfo_rssi_cesq, 6U, ",");
-//	static char *send_cmd = "AT+CESQ";
-//#endif
-//	int ret;
-//
-//	/* query modem RSSI */
-//	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-//			     &cmd, 1U, send_cmd, &mdata.sem_response,
-//			     MDM_CMD_TIMEOUT);
-//	if (ret < 0) {
-//		uPortLog("AT+C[E]SQ ret:%d", ret);
-//	}
-//
-//#if defined(CONFIG_MODEM_CELL_INFO)
-//	/* query cell info */
-//	ret = modem_cmd_handler_setup_cmds_nolock(&mctx.iface,
-//						  &mctx.cmd_handler,
-//						  query_cellinfo_cmds,
-//						  ARRAY_SIZE(query_cellinfo_cmds),
-//						  &mdata.sem_response,
-//						  MDM_CMD_TIMEOUT);
-//	if (ret < 0) {
-//		uPortLog("modem query for cell info returned %d", ret);
-//	}
-//#endif
-//
-//#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-//	/* re-start RSSI query work */
-//	if (work) {
-//		k_work_reschedule_for_queue(
-//			&modem_workq, &mdata.rssi_query_work,
-//			K_SECONDS(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK_PERIOD));
-//	}
-//#endif
-// }
-#endif
 
 static void modem_reset(void)
 {
@@ -1083,23 +456,25 @@ static void modem_reset(void)
 
 	// Power up the cellular module
 	if (uCellPwrOn(mdata.cellHandle, NULL, NULL) == 0) {
-		uPortLog("Modem powered");
+		LOG_INF("Modem powered");
 	}
+
+	pin_init();
 
 	// Connect to the cellular network with all default parameters
 	// if (uCellNetConnect(cellHandle, NULL, NULL, NULL, NULL, NULL) == 0) {
 	//		// Do things, for example
 	//		if (uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer)) >= 0)
-	//{ 			uPortLog("Registered on \"%s\"", buffer);
+	//{ 			LOG_INF("Registered on \"%s\"", buffer);
 	//		}
 	//		if (uCellNetGetMccMnc(cellHandle, &mcc, &mnc) == 0) {
-	//			uPortLog("The MCC/MNC of the network is %d%d", mcc, mnc);
+	//			LOG_INF("The MCC/MNC of the network is %d%d", mcc, mnc);
 	//		}
 	//		if (uCellNetGetIpAddressStr(cellHandle, buffer) >= 0) {
-	//			uPortLog("Our IP address is \"%s\"", buffer);
+	//			LOG_INF("Our IP address is \"%s\"", buffer);
 	//		}
 	//		if (uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer)) >= 0) {
-	//			uPortLog("The APN used was \"%s\"", buffer);
+	//			LOG_INF("The APN used was \"%s\"", buffer);
 	//		}
 	//
 	//		// When finished with the connection
@@ -1108,257 +483,8 @@ static void modem_reset(void)
 	//		// When finished using the module
 	//		// uCellPwrOff( cellHandle, NULL );
 	//} else {
-	//	uPortLog("uCellPwrOn failed");
+	//	LOG_INF("uCellPwrOn failed");
 	//}
-
-	//	int ret = 0, retry_count = 0, counter = 0;
-	//	static const struct setup_cmd setup_cmds[] = {
-	//		// turn off echo
-	//		SETUP_CMD_NOHANDLE("ATE0"),
-	//		// stop functionality
-	//		SETUP_CMD_NOHANDLE("AT+CFUN=0"),
-	//		// extended error numbers
-	//		SETUP_CMD_NOHANDLE("AT+CMEE=1"),
-	//#if defined(CONFIG_BOARD_PARTICLE_BORON)
-	//		// use external SIM
-	//		SETUP_CMD_NOHANDLE("AT+UGPIOC=23,0,0"),
-	//#endif
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_R4_NET_STATUS_PIN)
-	//		// enable the network status indication
-	//		SETUP_CMD_NOHANDLE("AT+UGPIOC="
-	//			STRINGIFY(CONFIG_MODEM_UBLOX_SARA_R4_NET_STATUS_PIN)
-	//			",2"),
-	//#endif
-	//		// UNC messages for registration
-	//		SETUP_CMD_NOHANDLE("AT+CREG=1"),
-	//		// query modem info
-	//		SETUP_CMD("AT+CGMI", "", on_cmd_atcmdinfo_manufacturer, 0U, ""),
-	//		SETUP_CMD("AT+CGMM", "", on_cmd_atcmdinfo_model, 0U, ""),
-	//		SETUP_CMD("AT+CGMR", "", on_cmd_atcmdinfo_revision, 0U, ""),
-	//		SETUP_CMD("AT+CGSN", "", on_cmd_atcmdinfo_imei, 0U, ""),
-	//		SETUP_CMD("AT+CIMI", "", on_cmd_atcmdinfo_imsi, 0U, ""),
-	//#if !defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-	//		// setup PDP context definition
-	//		SETUP_CMD_NOHANDLE("AT+CGDCONT=1,\"IP\",\""
-	//					CONFIG_MODEM_UBLOX_SARA_R4_APN "\""),
-	//		// start functionality
-	//		SETUP_CMD_NOHANDLE("AT+CFUN=1"),
-	//#endif
-	//	};
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-	//	static const struct setup_cmd post_setup_cmds_u2[] = {
-	//#if !defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-	//		// set the APN
-	//		SETUP_CMD_NOHANDLE("AT+UPSD=0,1,\""
-	//				CONFIG_MODEM_UBLOX_SARA_R4_APN "\""),
-	//#endif
-	//		// set dynamic IP
-	//		SETUP_CMD_NOHANDLE("AT+UPSD=0,7,\"0.0.0.0\""),
-	//		// activate the GPRS connection
-	//		SETUP_CMD_NOHANDLE("AT+UPSDA=0,3"),
-	//	};
-	//#endif
-	//
-	//	static const struct setup_cmd post_setup_cmds[] = {
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
-	//		/* set the APN
-	//		SETUP_CMD_NOHANDLE("AT+UPSD=0,1,\""
-	//				CONFIG_MODEM_UBLOX_SARA_R4_APN "\""),
-	//		/* set dynamic IP
-	//		SETUP_CMD_NOHANDLE("AT+UPSD=0,7,\"0.0.0.0\""),
-	//		/* activate the GPRS connection
-	//		SETUP_CMD_NOHANDLE("AT+UPSDA=0,3"),
-	//#else
-	//		/* activate the PDP context
-	//		SETUP_CMD_NOHANDLE("AT+CGACT=1,1"),
-	//#endif
-	//	};
-	//
-	// restart:
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-	//	mdata.mdm_apn[0] = '\0';
-	//	strncat(mdata.mdm_apn,
-	//		CONFIG_MODEM_UBLOX_SARA_R4_APN,
-	//		sizeof(mdata.mdm_apn)-1);
-	//#endif
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-	//	/* stop RSSI delay work
-	//	k_work_cancel_delayable(&mdata.rssi_query_work);
-	//#endif
-	//
-	//	pin_init();
-	//
-	//	uPortLog("Waiting for modem to respond");
-	//
-	//	/* Give the modem a while to start responding to simple 'AT' commands.
-	//	 * Also wait for CSPS=1 or RRCSTATE=1 notification
-	//
-	//	ret = -1;
-	//	while (counter++ < 50 && ret < 0) {
-	//		k_sleep(K_SECONDS(2));
-	//		ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//				     NULL, 0, "AT", &mdata.sem_response,
-	//				     MDM_CMD_TIMEOUT);
-	//		if (ret < 0 && ret != -ETIMEDOUT) {
-	//			break;
-	//		}
-	//	}
-	//
-	//	if (ret < 0) {
-	//		uPortLog("MODEM WAIT LOOP ERROR: %d", ret);
-	//		goto error;
-	//	}
-	//
-	//	ret = modem_cmd_handler_setup_cmds(&mctx.iface, &mctx.cmd_handler,
-	//					   setup_cmds, ARRAY_SIZE(setup_cmds),
-	//					   &mdata.sem_response,
-	//					   MDM_REGISTRATION_TIMEOUT);
-	//	if (ret < 0) {
-	//		goto error;
-	//	}
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-	//	/* autodetect APN from IMSI
-	//	char cmd[sizeof("AT+CGDCONT=1,\"IP\",\"\"")+MDM_APN_LENGTH];
-	//
-	//	snprintk(cmd, sizeof(cmd), "AT+CGDCONT=1,\"IP\",\"%s\"", mdata.mdm_apn);
-	//
-	//	/* setup PDP context definition
-	//	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//		NULL, 0,
-	//		(const char *)cmd,
-	//		&mdata.sem_response,
-	//		MDM_REGISTRATION_TIMEOUT);
-	//
-	//	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//		NULL, 0,
-	//		"AT+CFUN=1",
-	//		&mdata.sem_response,
-	//		MDM_REGISTRATION_TIMEOUT);
-	//#endif
-	//
-	//	if (strlen(CONFIG_MODEM_UBLOX_SARA_R4_MANUAL_MCCMNO) > 0) {
-	//		/* use manual MCC/MNO entry
-	//		ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//				     NULL, 0,
-	//				     "AT+COPS=1,2,\""
-	//					CONFIG_MODEM_UBLOX_SARA_R4_MANUAL_MCCMNO
-	//					"\"",
-	//				     &mdata.sem_response,
-	//				     MDM_REGISTRATION_TIMEOUT);
-	//	} else {
-	//		/* register operator automatically
-	//		ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//				     NULL, 0, "AT+COPS=0,0",
-	//				     &mdata.sem_response,
-	//				     MDM_REGISTRATION_TIMEOUT);
-	//	}
-	//
-	//	if (ret < 0) {
-	//		uPortLog("AT+COPS ret:%d", ret);
-	//		goto error;
-	//	}
-	//
-	//	uPortLog("Waiting for network");
-	//
-	//	/*
-	//	 * TODO: A lot of this should be setup as a 3GPP module to handle
-	//	 * basic connection to the network commands / polling
-	//
-	//
-	//	/* wait for +CREG: 1(normal) or 5(roaming)
-	//	counter = 0;
-	//	while (counter++ < 40 && mdata.ev_creg != 1 && mdata.ev_creg != 5) {
-	//		if (counter == 20) {
-	//			uPortLog("Force restart of RF functionality");
-	//
-	//			/* Disable RF temporarily
-	//			ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//				NULL, 0, "AT+CFUN=0", &mdata.sem_response,
-	//				MDM_CMD_TIMEOUT);
-	//
-	//			k_sleep(K_SECONDS(1));
-	//
-	//			/* Enable RF
-	//			ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//				NULL, 0, "AT+CFUN=1", &mdata.sem_response,
-	//				MDM_CMD_TIMEOUT);
-	//		}
-	//
-	//		k_sleep(K_SECONDS(1));
-	//	}
-	//
-	//	/* query modem RSSI
-	//	modem_rssi_query_work(NULL);
-	//	k_sleep(MDM_WAIT_FOR_RSSI_DELAY);
-	//
-	//	counter = 0;
-	//	/* wait for RSSI < 0 and > -1000
-	//	while (counter++ < MDM_WAIT_FOR_RSSI_COUNT &&
-	//	       (mdata.mdm_rssi >= 0 ||
-	//		mdata.mdm_rssi <= -1000)) {
-	//		modem_rssi_query_work(NULL);
-	//		k_sleep(MDM_WAIT_FOR_RSSI_DELAY);
-	//	}
-	//
-	//	if (mdata.mdm_rssi >= 0 || mdata.mdm_rssi <= -1000) {
-	//		retry_count++;
-	//		if (retry_count >= MDM_NETWORK_RETRY_COUNT) {
-	//			uPortLog("Failed network init.  Too many attempts!");
-	//			ret = -ENETUNREACH;
-	//			goto error;
-	//		}
-	//
-	//		uPortLog("Failed network init.  Restarting process.");
-	//		goto restart;
-	//	}
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-	//	if (mdata.mdm_variant == MDM_VARIANT_UBLOX_U2) {
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-	//		/* setup PDP context definition
-	//		char cmd[sizeof("AT+UPSD=0,1,\"%s\"")+MDM_APN_LENGTH];
-	//
-	//		snprintk(cmd, sizeof(cmd), "AT+UPSD=0,1,\"%s\"", mdata.mdm_apn);
-	//		ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler,
-	//			NULL, 0,
-	//			(const char *)cmd,
-	//			&mdata.sem_response,
-	//			MDM_REGISTRATION_TIMEOUT);
-	//#endif
-	//		ret = modem_cmd_handler_setup_cmds(&mctx.iface,
-	//			&mctx.cmd_handler,
-	//			post_setup_cmds_u2,
-	//			ARRAY_SIZE(post_setup_cmds_u2),
-	//			&mdata.sem_response,
-	//			MDM_REGISTRATION_TIMEOUT);
-	//	} else {
-	//#endif
-	//		ret = modem_cmd_handler_setup_cmds(&mctx.iface,
-	//					   &mctx.cmd_handler,
-	//					   post_setup_cmds,
-	//					   ARRAY_SIZE(post_setup_cmds),
-	//					   &mdata.sem_response,
-	//					   MDM_REGISTRATION_TIMEOUT);
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-	//	}
-	//#endif
-	//	if (ret < 0) {
-	//		goto error;
-	//	}
-	//
-	//	uPortLog("Network is ready.");
-	//
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-	//	/* start RSSI query
-	//	k_work_reschedule_for_queue(
-	//		&modem_workq, &mdata.rssi_query_work,
-	//		K_SECONDS(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK_PERIOD));
-	//#endif
 
 error:
 	return;
@@ -1367,7 +493,7 @@ error:
 void onSocketCloseCb(void *pCbData)
 {
 	static uint32_t nrOfClose = 0;
-	LOG_ERR("CB: Socket with id %d closed", *((int32_t*)pCbData));
+	LOG_ERR("CB: Socket with id %d closed", *((int32_t *)pCbData));
 
 	nrOfClose++;
 }
@@ -1451,7 +577,6 @@ error:
 /*
  * Socket Offload OPS
  */
-
 static const struct socket_op_vtable offload_socket_fd_op_vtable;
 
 static int offload_socket(int family, int type, int proto)
@@ -1472,33 +597,32 @@ static int offload_socket(int family, int type, int proto)
 static int offload_close(void *obj)
 {
 	int32_t retVal = 0;
-	static uint32_t err = 0;
 	struct modem_socket *sock = (struct modem_socket *)obj;
+
+	LOG_WRN("Close int socket %d", mdata.ubxSocketId);
 
 	/* make sure we assigned an id */
 	if (sock->id < mdata.socket_config.base_socket_num) {
+		LOG_WRN("sock->id < mdata.socket_config.base_socket_num (%d < %d)", sock->id,
+			mdata.socket_config.base_socket_num);
 		return 0;
 	}
-	LOG_INF("Close int socket %d", mdata.ubxSocketId);
 
 	if (sock->is_connected || sock->ip_proto == IPPROTO_UDP) {
+		LOG_WRN("sock->is_connected (%d), sock->ip_proto (%d)", sock->is_connected,
+			sock->ip_proto);
+
 		retVal = uSockShutdown(mdata.ubxSocketId, U_SOCK_SHUTDOWN_READ_WRITE);
 		if (retVal != 0) {
-			err++;
-			LOG_ERR("offload_close:uSockShutdown failed");
+			LOG_ERR("offload_close:uSockShutdown failed (%d)", retVal);
 		}
 
 		retVal = uSockClose(mdata.ubxSocketId);
 		if (retVal != 0) {
-			err++;
-			LOG_ERR("offload_close:uSockClose failed");
+			LOG_ERR("offload_close:uSockClose failed (%d)", retVal);
 		}
 
 		uSockCleanUp();
-	}
-
-	if (err != 0) {
-		LOG_ERR("ubx-wrapper err: %d", err);
 	}
 
 	modem_socket_put(&mdata.socket_config, sock->sock_fd);
@@ -1533,7 +657,7 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	}
 
 	if (sock->id < mdata.socket_config.base_socket_num - 1) {
-		uPortLog("Invalid socket_id(%d) from fd:%d", sock->id, sock->sock_fd);
+		LOG_ERR("Invalid socket_id(%d) from fd:%d", sock->id, sock->sock_fd);
 		errno = EINVAL;
 		return -1;
 	}
@@ -1755,7 +879,7 @@ static ssize_t offload_sendmsg(void *obj, const struct msghdr *msg, int flags)
 		full_len += msg->msg_iov[i].iov_len;
 	}
 
-	uPortLog("msg_iovlen:%zd flags:%d, full_len:%zd", msg->msg_iovlen, flags, full_len);
+	LOG_INF("msg_iovlen:%zd flags:%d, full_len:%zd", msg->msg_iovlen, flags, full_len);
 
 	while (full_len > sent) {
 		int removed = 0;
@@ -2021,9 +1145,7 @@ const struct socket_dns_offload offload_dns_ops = {
 static int net_offload_dummy_get(sa_family_t family, enum net_sock_type type,
 				 enum net_ip_protocol ip_proto, struct net_context **context)
 {
-
-	uPortLog("CONFIG_NET_SOCKETS_OFFLOAD must be enabled for this driver");
-
+	LOG_ERR("CONFIG_NET_SOCKETS_OFFLOAD must be enabled for this driver");
 	return -ENOTSUP;
 }
 
@@ -2189,31 +1311,19 @@ int32_t mdm_ubxlib_connect(void)
 		return U_CELL_ERROR_NOT_CONNECTED;
 	}
 
-	//	// NETWORK configuration for cellular
-	//	static const uNetworkCfgCell_t gNetworkCfg = {
-	//		.type = U_NETWORK_TYPE_CELL,
-	//		.pApn = NULL, /* APN: NULL to accept default.  If using a Thingstream SIM
-	// enter 				 "tsiot" here */ 		.timeoutSeconds =
-	// 240
-	// /* Connection timeout in seconds */
-	//	};
-	//
-	//	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, &gNetworkCfg) != 0) {
+	//	uNetworkCfgCell_t networkConfig = {
+	//		.type = U_NETWORK_TYPE_CELL, .version = 0, .timeoutSeconds = 180, .pApn =
+	// NULL,
+	//		/* APN: NULL to accept default/auto */};
+	//	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, &networkConfig) != 0) {
 	//		LOG_INF("uNetworkInterfaceUp failed");
 	//	}
 
-	if (uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer)) >= 0) {
-		LOG_INF("Registered on \"%s\"", buffer);
-	}
-	if (uCellNetGetMccMnc(cellHandle, &mcc, &mnc) == 0) {
-		LOG_INF("The MCC/MNC of the network is %d%d", mcc, mnc);
-	}
-	if (uCellNetGetIpAddressStr(cellHandle, buffer) >= 0) {
-		LOG_INF("Our IP address is \"%s\"", buffer);
-	}
-	if (uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer)) >= 0) {
-		LOG_INF("The APN used was \"%s\"", buffer);
-	}
+	uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer));
+	uCellNetGetMccMnc(cellHandle, &mcc, &mnc);
+	uCellNetGetIpAddressStr(cellHandle, buffer);
+	uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer));
+
 	return U_ERROR_COMMON_SUCCESS;
 }
 
