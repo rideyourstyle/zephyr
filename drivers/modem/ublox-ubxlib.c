@@ -6,6 +6,9 @@
 
 #define DT_DRV_COMPAT u_blox_ubxlib
 
+#define U_DEVICE_PRIVATE_I2C_MAX_NUM	    0
+#define U_DEVICE_PRIVATE_DEVICE_I2C_MAX_NUM 0
+
 #include <ctype.h>
 #include <errno.h>
 
@@ -49,6 +52,8 @@
 #define U_CFG_APP_PIN_CELL_VINT		-1 // 0
 
 #include <zephyr/logging/log.h>
+
+#include <u_device_shared.h>
 
 LOG_MODULE_REGISTER(ubx_wrapper);
 
@@ -114,6 +119,14 @@ NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE, 0, NULL)
 K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_UBLOX_SARA_R4_RX_WORKQ_STACK_SIZE);
 static struct k_work_q modem_workq;
 #endif
+
+// NETWORK configuration for cellular
+static const uNetworkCfgCell_t gNetworkCfg = {
+	.type = U_NETWORK_TYPE_CELL,
+	.pApn = NULL, /* APN: NULL to accept default.  If using a Thingstream SIM enter "tsiot" here
+		       */
+	.timeoutSeconds = 240 /* Connection timeout in seconds */
+};
 
 /* socket read callback data */
 struct socket_read_data {
@@ -189,7 +202,6 @@ static struct sockaddr result_addr;
 static char result_canonname[DNS_MAX_NAME_SIZE + 1];
 #endif
 
-
 /* send binary data via the +USO[ST/WR] commands */
 static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t timeout)
 {
@@ -205,14 +217,14 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 
 	for (int i = 0; i < msg->msg_iovlen; i++) {
 		if (!msg->msg_iov[i].iov_base || msg->msg_iov[i].iov_len == 0) {
-			errno = EINVAL;
+			// errno = EINVAL;
 			return -1;
 		}
 		buf_len += msg->msg_iov[i].iov_len;
 	}
 
 	if (!sock->is_connected && sock->ip_proto != IPPROTO_UDP) {
-		errno = ENOTCONN;
+		// errno = ENOTCONN;
 		return -1;
 	}
 
@@ -226,7 +238,7 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 	 */
 	if (buf_len > MDM_MAX_DATA_LENGTH) {
 		if (sock->type == SOCK_DGRAM) {
-			errno = EMSGSIZE;
+			// errno = EMSGSIZE;
 			retVal = -1;
 			goto exit;
 		}
@@ -413,53 +425,98 @@ static int pin_init(void)
 	return 0;
 }
 
+static const uDeviceCfg_t gDeviceCfg = {
+	.deviceType = U_DEVICE_TYPE_CELL,
+	.deviceCfg =
+		{
+			.cfgCell = {.moduleType = U_CELL_MODULE_TYPE_SARA_R5,
+				    .pSimPinCode = NULL, /* SIM pin */
+				    .pinEnablePower = U_CFG_APP_PIN_CELL_ENABLE_POWER,
+				    .pinPwrOn = U_CFG_APP_PIN_CELL_PWR_ON,
+				    .pinVInt = U_CFG_APP_PIN_CELL_VINT,
+				    .pinDtrPowerSaving = U_CFG_APP_PIN_CELL_DTR},
+		},
+	.transportType = U_DEVICE_TRANSPORT_TYPE_UART,
+	.transportCfg =
+		{
+			.cfgUart = {.uart = U_CFG_APP_CELL_UART,
+				    .baudRate = U_CELL_UART_BAUD_RATE,
+				    .pinTxd = U_CFG_APP_PIN_CELL_TXD,
+				    .pinRxd = U_CFG_APP_PIN_CELL_RXD,
+				    .pinCts = U_CFG_APP_PIN_CELL_CTS,
+				    .pinRts = U_CFG_APP_PIN_CELL_RTS},
+		},
+};
+
 static void modem_reset(void)
 {
-	int32_t uartHandle;
 	uAtClientHandle_t atHandle;
-
 	k_thread_system_pool_assign(k_current_get());
 
 	// Initialise the APIs we will need
 	uPortInit();
-	uAtClientInit();
-	uCellInit();
 
-	// Open a UART with the recommended buffer length
-	// on your chosen UART HW block and on the pins
-	// where the cellular module's UART interface is
-	// connected to your MCU: you need to know these
-	// for your hardware, either set the #defines
-	// appropriately or replace them with the right
-	// numbers, using -1 for a pin that is not connected.
-	uartHandle =
-		uPortUartOpen(U_CFG_APP_CELL_UART, 115200, NULL, U_CELL_UART_BUFFER_LENGTH_BYTES,
-			      U_CFG_APP_PIN_CELL_TXD, U_CFG_APP_PIN_CELL_RXD,
-			      U_CFG_APP_PIN_CELL_CTS, U_CFG_APP_PIN_CELL_RTS);
+#define USE_CELL 0
+	if (!USE_CELL) {
+		int32_t retVal;
 
-	// Add an AT client on the UART with the recommended
-	// default buffer size.
-	atHandle = uAtClientAdd(uartHandle, U_AT_CLIENT_STREAM_TYPE_UART, NULL,
-				U_CELL_AT_BUFFER_LENGTH_BYTES);
+		uDeviceInit();
 
-	// Set printing of AT commands by the cellular driver,
-	// which can be useful while debugging.
-	// uAtClientPrintAtSet(atHandle, true);
+		retVal = uDeviceOpen(&gDeviceCfg, &mdata.cellHandle);
+		if (retVal != 0) {
+			LOG_INF("## Opened device with return code %d", retVal);
+		}
 
-	// Add a cell instance, in this case a SARA-R5 module,
-	// giving it the AT client handle and the pins where
-	// the cellular module's control interface is
-	// connected to your MCU: you need to know these for
-	// your hardware; again use -1 for "not connected".
-	uCellAdd(U_CELL_MODULE_TYPE_SARA_R5, atHandle, U_CFG_APP_PIN_CELL_ENABLE_POWER,
-		 U_CFG_APP_PIN_CELL_PWR_ON, U_CFG_APP_PIN_CELL_VINT, false, &mdata.cellHandle);
+		if (uCellAtClientHandleGet(mdata.cellHandle, &atHandle) == 0) {
+			// Switch AT printing off
+			// bool atPrintOn = uAtClientPrintAtGet(atHandle);
+			// LOG_INF("%d", atPrintOn);
+			uAtClientPrintAtSet(atHandle, false);
+		}
 
-	// Power up the cellular module
-	if (uCellPwrOn(mdata.cellHandle, NULL, NULL) == 0) {
-		LOG_INF("Modem powered");
+	} else {
+		int32_t uartHandle;
+
+		uAtClientInit();
+		uCellInit();
+
+		// Open a UART with the recommended buffer length
+		// on your chosen UART HW block and on the pins
+		// where the cellular module's UART interface is
+		// connected to your MCU: you need to know these
+		// for your hardware, either set the #defines
+		// appropriately or replace them with the right
+		// numbers, using -1 for a pin that is not connected.
+		uartHandle = uPortUartOpen(U_CFG_APP_CELL_UART, 115200, NULL,
+					   U_CELL_UART_BUFFER_LENGTH_BYTES, U_CFG_APP_PIN_CELL_TXD,
+					   U_CFG_APP_PIN_CELL_RXD, U_CFG_APP_PIN_CELL_CTS,
+					   U_CFG_APP_PIN_CELL_RTS);
+
+		// Add an AT client on the UART with the recommended
+		// default buffer size.
+		atHandle = uAtClientAdd(uartHandle, U_AT_CLIENT_STREAM_TYPE_UART, NULL,
+					U_CELL_AT_BUFFER_LENGTH_BYTES);
+
+		// Set printing of AT commands by the cellular driver,
+		// which can be useful while debugging.
+		// uAtClientPrintAtSet(atHandle, true);
+
+		// Add a cell instance, in this case a SARA-R5 module,
+		// giving it the AT client handle and the pins where
+		// the cellular module's control interface is
+		// connected to your MCU: you need to know these for
+		// your hardware; again use -1 for "not connected".
+		uCellAdd(U_CELL_MODULE_TYPE_SARA_R5, atHandle, U_CFG_APP_PIN_CELL_ENABLE_POWER,
+			 U_CFG_APP_PIN_CELL_PWR_ON, U_CFG_APP_PIN_CELL_VINT, false,
+			 &mdata.cellHandle);
+
+		// Power up the cellular module
+		if (uCellPwrOn(mdata.cellHandle, NULL, NULL) == 0) {
+			LOG_INF("Modem powered");
+		}
+
+		pin_init();
 	}
-
-	pin_init();
 
 	// Connect to the cellular network with all default parameters
 	// if (uCellNetConnect(cellHandle, NULL, NULL, NULL, NULL, NULL) == 0) {
@@ -493,9 +550,13 @@ error:
 void onSocketCloseCb(void *pCbData)
 {
 	static uint32_t nrOfClose = 0;
-	LOG_ERR("CB: Socket with id %d closed", *((int32_t *)pCbData));
+	LOG_DBG("CB: Socket with id %d closed", *((int32_t *)pCbData));
+	LOG_DBG("    nrOfClose: %d", nrOfClose++);
+}
 
-	nrOfClose++;
+void onDataReceivedCb(void *pCbData)
+{
+	LOG_DBG("CB: Data received from socket %d", *((int32_t *)pCbData));
 }
 
 /*
@@ -522,6 +583,7 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr)
 	LOG_INF("Create socket with ubx id:", retVal);
 	mdata.ubxSocketId = retVal;
 
+	uSockRegisterCallbackData(retVal, onDataReceivedCb, &mdata.ubxSocketId);
 	uSockRegisterCallbackClosed(retVal, onSocketCloseCb, &mdata.ubxSocketId);
 
 	// TODO: Handle socket security
@@ -565,12 +627,12 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr)
 	//		}
 	//	}
 	//
-	errno = 0;
+	// errno = 0;
 	return 0;
 
 error:
 	modem_socket_put(&mdata.socket_config, sock->sock_fd);
-	errno = -1;
+	// errno = -1;
 	return -1;
 }
 
@@ -586,11 +648,11 @@ static int offload_socket(int family, int type, int proto)
 	/* defer modem's socket create call to bind() */
 	ret = modem_socket_get(&mdata.socket_config, family, type, proto);
 	if (ret < 0) {
-		errno = -ret;
+		// errno = -ret;
 		return -1;
 	}
 
-	errno = 0;
+	// errno = 0;
 	return ret;
 }
 
@@ -599,7 +661,7 @@ static int offload_close(void *obj)
 	int32_t retVal = 0;
 	struct modem_socket *sock = (struct modem_socket *)obj;
 
-	LOG_WRN("Close int socket %d", mdata.ubxSocketId);
+	LOG_WRN("Close mdata.ubxSocketId: %d", mdata.ubxSocketId);
 
 	/* make sure we assigned an id */
 	if (sock->id < mdata.socket_config.base_socket_num) {
@@ -652,24 +714,17 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	uSockAddress_t address = {0};
 
 	if (!addr) {
-		errno = EINVAL;
+		// errno = EINVAL;
 		return -1;
 	}
 
-	if (sock->id < mdata.socket_config.base_socket_num - 1) {
-		LOG_ERR("Invalid socket_id(%d) from fd:%d", sock->id, sock->sock_fd);
-		errno = EINVAL;
+	LOG_INF("offload_connect sock->id: %d, mdata.ubxSocketId: %d", sock->id, mdata.ubxSocketId);
+
+	int retVal = create_socket(sock, NULL);
+	if (retVal != 0) {
+		LOG_ERR("create_socket() failed: %d", retVal);
 		return -1;
 	}
-
-	LOG_ERR("%d, %d", mdata.socket_config.base_socket_num, mdata.ubxSocketId);
-
-	/* make sure we've created the socket */
-	// if (sock->id == mdata.socket_config.sockets_len + 1) {
-	if (create_socket(sock, NULL) < 0) {
-		return -1;
-	}
-	//}
 
 	memcpy(&sock->dst, addr, sizeof(*addr));
 	if (addr->sa_family == AF_INET6) {
@@ -677,13 +732,13 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	} else if (addr->sa_family == AF_INET) {
 		address.port = ntohs(net_sin(addr)->sin_port);
 	} else {
-		errno = EAFNOSUPPORT;
+		// errno = EAFNOSUPPORT;
 		return -1;
 	}
 
 	/* skip socket connect if UDP */
 	if (sock->ip_proto == IPPROTO_UDP) {
-		errno = 0;
+		// errno = 0;
 		return 0;
 	}
 
@@ -691,19 +746,23 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	address.ipAddress.address.ipv4 = (addr->data[2] << 24) + (addr->data[3] << 16) +
 					 (addr->data[4] << 8) + (addr->data[5] << 0);
 
-	LOG_INF("Connect via int socket %d", mdata.ubxSocketId);
+	LOG_INF("Connect via mdata.ubxSocketId %d", mdata.ubxSocketId);
 	if (mdata.ubxSocketId < 0) {
 		LOG_ERR("No valid ubxSocketId: %d", mdata.ubxSocketId);
 		return -1;
 	}
-	int32_t retVal = uSockConnect(mdata.ubxSocketId, &address);
+	retVal = uSockConnect(mdata.ubxSocketId, &address);
 	if (retVal != 0) {
-		LOG_ERR("uSockConnect failed");
+		LOG_ERR("uSockConnect() failed");
 		return -1;
 	}
 
 	sock->is_connected = true;
-	errno = 0;
+
+	if (sock->id != mdata.ubxSocketId) {
+		LOG_WRN("sock->id != mdata.ubxSocketId (%d != %d)", sock->id, mdata.ubxSocketId);
+	}
+	// errno = 0;
 	return 0;
 }
 
@@ -716,24 +775,24 @@ static ssize_t offload_recvfrom(void *obj, void *buf, size_t len, int flags, str
 	struct socket_read_data sock_data;
 
 	if (!buf || len == 0) {
-		errno = EINVAL;
+		// errno = EINVAL;
 		return -1;
 	}
 
 	if (flags & ZSOCK_MSG_PEEK) {
-		errno = ENOTSUP;
+		// errno = ENOTSUP;
 		return -1;
 	}
 
 	// next_packet_size = modem_socket_next_packet_size(&mdata.socket_config, sock);
 	// if (!next_packet_size) {
 	if (flags & ZSOCK_MSG_DONTWAIT) {
-		errno = EAGAIN;
+		// errno = EAGAIN;
 		return -1;
 	}
 
 	if (!sock->is_connected && sock->ip_proto != IPPROTO_UDP) {
-		errno = 0;
+		// errno = 0;
 		return 0;
 	}
 
@@ -763,16 +822,12 @@ static ssize_t offload_recvfrom(void *obj, void *buf, size_t len, int flags, str
 	retVal = uSockRead(mdata.ubxSocketId, buf, len);
 
 	if (retVal < 0) {
-		LOG_WRN("uSockRead failed: %d", retVal);
-	}
-	sock_data.recv_read_len += retVal;
-
-	if (retVal < 0) {
 		LOG_ERR("uSockRead failed: %d", retVal);
-		errno = -retVal;
+		// errno = -retVal;
 		retVal = -1;
 		goto exit;
 	}
+	sock_data.recv_read_len += retVal;
 
 	/* HACK: use dst address as from */
 	if (from && fromlen) {
@@ -781,7 +836,7 @@ static ssize_t offload_recvfrom(void *obj, void *buf, size_t len, int flags, str
 	}
 
 	/* return length of received data */
-	errno = 0;
+	// errno = 0;
 	retVal = sock_data.recv_read_len;
 
 exit:
@@ -807,11 +862,11 @@ static ssize_t offload_sendto(void *obj, const void *buf, size_t len, int flags,
 	int retVal = send_socket_data(obj, &msg, MDM_CMD_TIMEOUT);
 	if (retVal < 0) {
 		LOG_ERR("uSockWrite failed: %d", retVal);
-		errno = -retVal;
+		// errno = -retVal;
 		return -1;
 	}
 
-	errno = 0;
+	// errno = 0;
 	return retVal;
 }
 
@@ -843,7 +898,7 @@ static int offload_ioctl(void *obj, unsigned int request, va_list args)
 		return 0;
 
 	default:
-		errno = EINVAL;
+		// errno = EINVAL;
 		return -1;
 	}
 }
@@ -873,7 +928,7 @@ static ssize_t offload_sendmsg(void *obj, const struct msghdr *msg, int flags)
 	/* Compute the full length to be send and check for invalid values */
 	for (int i = 0; i < msg->msg_iovlen; i++) {
 		if (!msg->msg_iov[i].iov_base || msg->msg_iov[i].iov_len == 0) {
-			errno = EINVAL;
+			// errno = EINVAL;
 			return -1;
 		}
 		full_len += msg->msg_iov[i].iov_len;
@@ -929,7 +984,7 @@ static ssize_t offload_sendmsg(void *obj, const struct msghdr *msg, int flags)
 
 		/* Handle send_socket_data() returned value */
 		if (ret < 0) {
-			errno = -ret;
+			// errno = -ret;
 			return -1;
 		}
 
@@ -1292,6 +1347,15 @@ bool mdm_get_handle(uDeviceHandle_t *cellHandle)
 	}
 }
 
+void networkStatusCb(uDeviceHandle_t devHandle, uNetworkType_t netType, bool isUp,
+		     uNetworkStatus_t *pStatus, void *pParameter)
+{
+	LOG_DBG("devHandle: %d", devHandle);
+	LOG_DBG("netType:   %d", netType);
+	LOG_DBG("isUp:      %d", isUp);
+	LOG_DBG("pStatus:   %d", pStatus);
+}
+
 int32_t mdm_ubxlib_connect(void)
 {
 	char buffer[U_CELL_NET_IP_ADDRESS_SIZE];
@@ -1306,9 +1370,20 @@ int32_t mdm_ubxlib_connect(void)
 
 	// Connect to the cellular network with all default parameters
 	mdata.startTimeMs = k_uptime_get();
-	if (uCellNetConnect(cellHandle, NULL, NULL, NULL, NULL, keepGoingCallback) != 0) {
-		LOG_WRN("uCellNetConnect failed");
+
+	//	if (uCellNetConnect(cellHandle, NULL, NULL, NULL, NULL, keepGoingCallback) != 0) {
+	//		LOG_WRN("uCellNetConnect failed");
+	//		return U_CELL_ERROR_NOT_CONNECTED;
+	//	}
+
+	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, &gNetworkCfg) != 0) {
+		LOG_WRN("uNetworkInterfaceUp failed");
 		return U_CELL_ERROR_NOT_CONNECTED;
+	}
+
+	if (uNetworkSetStatusCallback(cellHandle, U_NETWORK_TYPE_CELL, networkStatusCb, NULL) !=
+	    0) {
+		LOG_WRN("uNetworkSetStatusCallback failed");
 	}
 
 	//	uNetworkCfgCell_t networkConfig = {
@@ -1375,6 +1450,15 @@ int32_t mdm_ubxlib_power_off(void)
 	}
 
 	return U_ERROR_COMMON_SUCCESS;
+}
+
+int32_t mdm_ubxlib_get_rssi_dbm(void)
+{
+	uDeviceHandle_t cellHandle = mdata.cellHandle;
+
+	uCellInfoRefreshRadioParameters(cellHandle);
+
+	return uCellInfoGetRssiDbm(cellHandle);
 }
 
 NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, modem_init, NULL, &mdata, NULL,

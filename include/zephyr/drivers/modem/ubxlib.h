@@ -285,6 +285,7 @@ int32_t mdm_ubxlib_power_on(void);
  */
 int32_t mdm_ubxlib_power_off(void);
 
+int32_t mdm_ubxlib_get_rssi_dbm(void);
 
 bool mdm_get_handle(uDeviceHandle_t *cellHandle);
 
