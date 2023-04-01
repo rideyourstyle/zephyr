@@ -58,8 +58,11 @@
 LOG_MODULE_REGISTER(ubx_wrapper);
 
 #define U_CELL_NET_SCAN_RETRIES 1
+
 #include "u_cfg_app_platform_specific.h"
 #include "ubxlib.h"
+
+#include <zephyr/drivers/modem/ubxlib.h>
 
 ///* pin settings
 // static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_power_gpios);
@@ -152,6 +155,9 @@ struct modem_data {
 	/* socket data */
 	struct modem_socket_config socket_config;
 	struct modem_socket sockets[MDM_MAX_SOCKETS];
+
+	//	connectedCallback connectedCallback;
+	networkStatusCallback networkStatusCallback;
 
 #if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
 	/* RSSI work */
@@ -661,6 +667,9 @@ static int offload_close(void *obj)
 	int32_t retVal = 0;
 	struct modem_socket *sock = (struct modem_socket *)obj;
 
+    static uint32_t cntEnter = 0;
+    static uint32_t cntExit = 0;
+    LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter, cntExit);
 	LOG_WRN("Close mdata.ubxSocketId: %d", mdata.ubxSocketId);
 
 	/* make sure we assigned an id */
@@ -669,6 +678,7 @@ static int offload_close(void *obj)
 			mdata.socket_config.base_socket_num);
 		return 0;
 	}
+    LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter++, cntExit);
 
 	if (sock->is_connected || sock->ip_proto == IPPROTO_UDP) {
 		LOG_WRN("sock->is_connected (%d), sock->ip_proto (%d)", sock->is_connected,
@@ -688,7 +698,10 @@ static int offload_close(void *obj)
 	}
 
 	modem_socket_put(&mdata.socket_config, sock->sock_fd);
-	return retVal;
+
+    LOG_WRN("Exit static int offload_close (%d/%d)", cntEnter, cntExit++);
+
+    return retVal;
 }
 
 static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrlen)
@@ -1347,16 +1360,31 @@ bool mdm_get_handle(uDeviceHandle_t *cellHandle)
 	}
 }
 
+// bool mdm_ubxlib_register_connect_cb(connectedCallback cb)
+//{
+//	mdata.connectedCallback = cb;
+//	return true;
+// }
+
+bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb)
+{
+	mdata.networkStatusCallback = cb;
+	return true;
+}
+
 void networkStatusCb(uDeviceHandle_t devHandle, uNetworkType_t netType, bool isUp,
 		     uNetworkStatus_t *pStatus, void *pParameter)
 {
+	if (mdata.networkStatusCallback != NULL) {
+		mdata.networkStatusCallback(pStatus);
+	}
 	LOG_DBG("devHandle: %d", devHandle);
 	LOG_DBG("netType:   %d", netType);
 	LOG_DBG("isUp:      %d", isUp);
 	LOG_DBG("pStatus:   %d", pStatus);
 }
 
-int32_t mdm_ubxlib_connect(void)
+int32_t mdm_ubxlib_bring_interface_up(void)
 {
 	char buffer[U_CELL_NET_IP_ADDRESS_SIZE];
 	int32_t mcc;
@@ -1371,11 +1399,6 @@ int32_t mdm_ubxlib_connect(void)
 	// Connect to the cellular network with all default parameters
 	mdata.startTimeMs = k_uptime_get();
 
-	//	if (uCellNetConnect(cellHandle, NULL, NULL, NULL, NULL, keepGoingCallback) != 0) {
-	//		LOG_WRN("uCellNetConnect failed");
-	//		return U_CELL_ERROR_NOT_CONNECTED;
-	//	}
-
 	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, &gNetworkCfg) != 0) {
 		LOG_WRN("uNetworkInterfaceUp failed");
 		return U_CELL_ERROR_NOT_CONNECTED;
@@ -1386,18 +1409,35 @@ int32_t mdm_ubxlib_connect(void)
 		LOG_WRN("uNetworkSetStatusCallback failed");
 	}
 
-	//	uNetworkCfgCell_t networkConfig = {
-	//		.type = U_NETWORK_TYPE_CELL, .version = 0, .timeoutSeconds = 180, .pApn =
-	// NULL,
-	//		/* APN: NULL to accept default/auto */};
-	//	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, &networkConfig) != 0) {
-	//		LOG_INF("uNetworkInterfaceUp failed");
-	//	}
+	//	uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer));
+	//	uCellNetGetMccMnc(cellHandle, &mcc, &mnc);
+	//	uCellNetGetIpAddressStr(cellHandle, buffer);
+	//	uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer));
 
-	uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer));
-	uCellNetGetMccMnc(cellHandle, &mcc, &mnc);
-	uCellNetGetIpAddressStr(cellHandle, buffer);
-	uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer));
+	//	if (mdata.connectedCallback != NULL) {
+	//		mdata.connectedCallback();
+	//	}
+	return U_ERROR_COMMON_SUCCESS;
+}
+
+uint32_t mdm_ubxlib_interface_down(void)
+{
+	uDeviceHandle_t cellHandle = mdata.cellHandle;
+
+	if (cellHandle == NULL) {
+		LOG_ERR("Cell handle not registered");
+		return U_ERROR_COMMON_PLATFORM;
+	}
+
+	if (uNetworkInterfaceDown(cellHandle, U_NETWORK_TYPE_CELL) != 0) {
+		LOG_WRN("uNetworkInterfaceDown failed");
+		return U_ERROR_COMMON_PLATFORM;
+	}
+
+	LOG_INF("uSockCleanUp()");
+	uSockCleanUp();
+	LOG_INF("uSockDeinit()");
+	uSockDeinit();
 
 	return U_ERROR_COMMON_SUCCESS;
 }
@@ -1410,8 +1450,8 @@ int32_t mdm_ubxlib_disconnect(void)
 		LOG_ERR("Cell handle not registered");
 		return U_ERROR_COMMON_PLATFORM;
 	}
-	if (uCellNetDisconnect(cellHandle, NULL) != 0) {
-		LOG_ERR("uCellNetDisconnect failed");
+	if (uNetworkInterfaceDown(cellHandle, U_NETWORK_TYPE_CELL) != 0) {
+		LOG_ERR("uNetworkInterfaceDown failed");
 		return U_ERROR_COMMON_PLATFORM;
 	}
 
