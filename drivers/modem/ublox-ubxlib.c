@@ -9,6 +9,10 @@
 #define U_DEVICE_PRIVATE_I2C_MAX_NUM	    0
 #define U_DEVICE_PRIVATE_DEVICE_I2C_MAX_NUM 0
 
+//#define U_CFG_OS_APP_TASK_PRIORITY	   4
+//#define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
+//#define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
+
 #include <ctype.h>
 #include <errno.h>
 
@@ -123,13 +127,6 @@ K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_UBLOX_SARA_R4_RX_WORKQ_STA
 static struct k_work_q modem_workq;
 #endif
 
-// NETWORK configuration for cellular
-static const uNetworkCfgCell_t gNetworkCfg = {
-	.type = U_NETWORK_TYPE_CELL,
-	.pApn = NULL, /* APN: NULL to accept default.  If using a Thingstream SIM enter "tsiot" here
-		       */
-	.timeoutSeconds = 240 /* Connection timeout in seconds */
-};
 
 /* socket read callback data */
 struct socket_read_data {
@@ -667,9 +664,9 @@ static int offload_close(void *obj)
 	int32_t retVal = 0;
 	struct modem_socket *sock = (struct modem_socket *)obj;
 
-    static uint32_t cntEnter = 0;
-    static uint32_t cntExit = 0;
-    LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter, cntExit);
+	static uint32_t cntEnter = 0;
+	static uint32_t cntExit = 0;
+	LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter, cntExit);
 	LOG_WRN("Close mdata.ubxSocketId: %d", mdata.ubxSocketId);
 
 	/* make sure we assigned an id */
@@ -678,7 +675,7 @@ static int offload_close(void *obj)
 			mdata.socket_config.base_socket_num);
 		return 0;
 	}
-    LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter++, cntExit);
+	LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter++, cntExit);
 
 	if (sock->is_connected || sock->ip_proto == IPPROTO_UDP) {
 		LOG_WRN("sock->is_connected (%d), sock->ip_proto (%d)", sock->is_connected,
@@ -699,9 +696,9 @@ static int offload_close(void *obj)
 
 	modem_socket_put(&mdata.socket_config, sock->sock_fd);
 
-    LOG_WRN("Exit static int offload_close (%d/%d)", cntEnter, cntExit++);
+	LOG_WRN("Exit static int offload_close (%d/%d)", cntEnter, cntExit++);
 
-    return retVal;
+	return retVal;
 }
 
 static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrlen)
@@ -1384,7 +1381,7 @@ void networkStatusCb(uDeviceHandle_t devHandle, uNetworkType_t netType, bool isU
 	LOG_DBG("pStatus:   %d", pStatus);
 }
 
-int32_t mdm_ubxlib_bring_interface_up(void)
+int32_t mdm_ubxlib_bring_interface_up(const void *pCfg)
 {
 	char buffer[U_CELL_NET_IP_ADDRESS_SIZE];
 	int32_t mcc;
@@ -1399,7 +1396,7 @@ int32_t mdm_ubxlib_bring_interface_up(void)
 	// Connect to the cellular network with all default parameters
 	mdata.startTimeMs = k_uptime_get();
 
-	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, &gNetworkCfg) != 0) {
+	if (uNetworkInterfaceUp(cellHandle, U_NETWORK_TYPE_CELL, pCfg) != 0) {
 		LOG_WRN("uNetworkInterfaceUp failed");
 		return U_CELL_ERROR_NOT_CONNECTED;
 	}

@@ -265,9 +265,16 @@ typedef void ( *networkStatusCallback )( uNetworkStatus_t *pStatus );
 /**
  * @brief Connect to network
  *
- * @return int32_t 0 for success
+ * @return 0 for success
  */
-int32_t mdm_ubxlib_bring_interface_up(void);
+int32_t mdm_ubxlib_bring_interface_up(const void *pCfg);
+
+/**
+ * @brief Connect to network
+ *
+ * @return 0 for success
+ */
+uint32_t mdm_ubxlib_interface_down( void );
 
 /**
  * @brief Disconnect from network
@@ -295,7 +302,6 @@ int32_t mdm_ubxlib_get_rssi_dbm(void);
 bool mdm_get_handle(uDeviceHandle_t *cellHandle);
 //bool mdm_ubxlib_register_connect_cb(connectedCallback cb);
 bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
-uint32_t mdm_ubxlib_interface_down( void );
 
 
 ///**
