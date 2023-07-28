@@ -1319,8 +1319,8 @@ static int modem_init(const struct device *dev)
 
 	ret = modem_context_register(&mctx);
 	if (ret < 0) {
-		LOG_ERR("Error modem_context_register: %d", ret);
-		goto error;
+		LOG_ERR("SKIP: Error modem_context_register: %d", ret);
+		//goto error;
 	}
 
 #if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
@@ -1496,6 +1496,12 @@ int32_t mdm_ubxlib_get_rssi_dbm(void)
 	uCellInfoRefreshRadioParameters(cellHandle);
 
 	return uCellInfoGetRssiDbm(cellHandle);
+}
+
+int32_t mdm_reset_modem(void )
+{
+    modem_init(NULL);
+    return 0;
 }
 
 NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, modem_init, NULL, &mdata, NULL,

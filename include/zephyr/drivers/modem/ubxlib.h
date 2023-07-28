@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #include <zephyr/types.h>
+
 #include <u_device.h>
 #include <u_network.h>
 //
@@ -50,7 +51,7 @@ extern "C" {
 //
 //#define MDM_HL7800_APN_CMD_MAX_STRLEN (MDM_HL7800_APN_CMD_MAX_SIZE - 1)
 //
-//struct mdm_hl7800_apn {
+// struct mdm_hl7800_apn {
 //	char value[MDM_HL7800_APN_MAX_SIZE];
 //	char username[MDM_HL7800_APN_USERNAME_MAX_SIZE];
 //	char password[MDM_HL7800_APN_PASSWORD_MAX_SIZE];
@@ -84,16 +85,16 @@ extern "C" {
 //
 //#define MDM_HL7800_SET_POLTE_USER_AND_PASSWORD_FMT_STR "AT%%POLTECMD=\"SERVERAUTH\",\"%s\",\"%s\""
 //
-//struct mdm_hl7800_site_survey {
+// struct mdm_hl7800_site_survey {
 //	uint32_t earfcn; /* EUTRA Absolute Radio Frequency Channel Number */
 //	uint32_t cell_id;
 //	int rsrp;
 //	int rsrq;
 //};
 //
-//enum mdm_hl7800_radio_mode { MDM_RAT_CAT_M1 = 0, MDM_RAT_CAT_NB1 };
+// enum mdm_hl7800_radio_mode { MDM_RAT_CAT_M1 = 0, MDM_RAT_CAT_NB1 };
 //
-//enum mdm_hl7800_event {
+// enum mdm_hl7800_event {
 //	HL7800_EVENT_RESERVED = 0,
 //	HL7800_EVENT_NETWORK_STATE_CHANGE,
 //	HL7800_EVENT_APN_UPDATE,
@@ -115,7 +116,7 @@ extern "C" {
 //	HL7800_EVENT_SITE_SURVEY,
 //};
 //
-//enum mdm_hl7800_startup_state {
+// enum mdm_hl7800_startup_state {
 //	HL7800_STARTUP_STATE_READY = 0,
 //	HL7800_STARTUP_STATE_WAITING_FOR_ACCESS_CODE,
 //	HL7800_STARTUP_STATE_SIM_NOT_PRESENT,
@@ -125,7 +126,7 @@ extern "C" {
 //	HL7800_STARTUP_STATE_INACTIVE_SIM
 //};
 //
-//enum mdm_hl7800_network_state {
+// enum mdm_hl7800_network_state {
 //	HL7800_NOT_REGISTERED = 0,
 //	HL7800_HOME_NETWORK,
 //	HL7800_SEARCHING,
@@ -137,7 +138,7 @@ extern "C" {
 //	HL7800_UNABLE_TO_CONFIGURE = 0xf0
 //};
 //
-//enum mdm_hl7800_sleep {
+// enum mdm_hl7800_sleep {
 //	HL7800_SLEEP_UNINITIALIZED = 0,
 //	HL7800_SLEEP_HIBERNATE,
 //	HL7800_SLEEP_AWAKE,
@@ -145,7 +146,7 @@ extern "C" {
 //	HL7800_SLEEP_SLEEP,
 //};
 //
-//enum mdm_hl7800_fota_state {
+// enum mdm_hl7800_fota_state {
 //	HL7800_FOTA_IDLE,
 //	HL7800_FOTA_START,
 //	HL7800_FOTA_WIP,
@@ -157,7 +158,7 @@ extern "C" {
 //	HL7800_FOTA_COMPLETE,
 //};
 //
-//enum mdm_hl7800_functionality {
+// enum mdm_hl7800_functionality {
 //	HL7800_FUNCTIONALITY_MINIMUM = 0,
 //	HL7800_FUNCTIONALITY_FULL = 1,
 //	HL7800_FUNCTIONALITY_AIRPLANE = 4
@@ -166,12 +167,12 @@ extern "C" {
 ///* The modem reports state values as an enumeration and a string.
 // * GPS values are reported with a type of value and string.
 // */
-//struct mdm_hl7800_compound_event {
+// struct mdm_hl7800_compound_event {
 //	uint8_t code;
 //	char *string;
 //};
 //
-//enum mdm_hl7800_gnss_event {
+// enum mdm_hl7800_gnss_event {
 //	HL7800_GNSS_EVENT_INVALID = -1,
 //	HL7800_GNSS_EVENT_INIT,
 //	HL7800_GNSS_EVENT_START,
@@ -179,13 +180,13 @@ extern "C" {
 //	HL7800_GNSS_EVENT_POSITION,
 //};
 //
-//enum mdm_hl7800_gnss_status {
+// enum mdm_hl7800_gnss_status {
 //	HL7800_GNSS_STATUS_INVALID = -1,
 //	HL7800_GNSS_STATUS_FAILURE,
 //	HL7800_GNSS_STATUS_SUCCESS,
 //};
 //
-//enum mdm_hl7800_gnss_position_event {
+// enum mdm_hl7800_gnss_position_event {
 //	HL7800_GNSS_POSITION_EVENT_INVALID = -1,
 //	HL7800_GNSS_POSITION_EVENT_LOST_OR_NOT_AVAILABLE_YET,
 //	HL7800_GNSS_POSITION_EVENT_PREDICTION_AVAILABLE,
@@ -194,7 +195,7 @@ extern "C" {
 //	HL7800_GNSS_POSITION_EVENT_FIXED_TO_INVALID,
 //};
 //
-//enum mdm_hl7800_gps_string_types {
+// enum mdm_hl7800_gps_string_types {
 //	HL7800_GPS_STR_LATITUDE,
 //	HL7800_GPS_STR_LONGITUDE,
 //	HL7800_GPS_STR_GPS_TIME,
@@ -210,7 +211,7 @@ extern "C" {
 ///* status: negative errno, 0 on success
 // * user and password aren't valid if status is non-zero.
 // */
-//struct mdm_hl7800_polte_registration_event_data {
+// struct mdm_hl7800_polte_registration_event_data {
 //	int status;
 //	char *user;
 //	char *password;
@@ -219,7 +220,7 @@ extern "C" {
 ///* status: negative errno, 0 on success, non-zero error code
 // * Data is not valid if status is non-zero.
 // */
-//struct mdm_hl7800_polte_location_data {
+// struct mdm_hl7800_polte_location_data {
 //	uint32_t timestamp;
 //	int status;
 //	char latitude[MDM_HL7800_MAX_POLTE_LOCATION_STR_SIZE];
@@ -249,18 +250,17 @@ extern "C" {
 // * HL7800_EVENT_POLTE_LOCATE_STATUS int
 // * HL7800_EVENT_SITE_SURVEY mdm_hl7800_site_survey
 // */
-//typedef void (*mdm_hl7800_event_callback_t)(enum mdm_hl7800_event event,
+// typedef void (*mdm_hl7800_event_callback_t)(enum mdm_hl7800_event event,
 //					    void *event_data);
 //
-//struct mdm_hl7800_callback_agent {
+// struct mdm_hl7800_callback_agent {
 //	sys_snode_t node;
 //	mdm_hl7800_event_callback_t event_callback;
 //};
 //
 
-
-//typedef void ( *connectedCallback )( void );
-typedef void ( *networkStatusCallback )( uNetworkStatus_t *pStatus );
+// typedef void ( *connectedCallback )( void );
+typedef void (*networkStatusCallback)(uNetworkStatus_t *pStatus);
 
 /**
  * @brief Connect to network
@@ -274,7 +274,7 @@ int32_t mdm_ubxlib_bring_interface_up(const void *pCfg);
  *
  * @return 0 for success
  */
-uint32_t mdm_ubxlib_interface_down( void );
+uint32_t mdm_ubxlib_interface_down(void);
 
 /**
  * @brief Disconnect from network
@@ -298,25 +298,25 @@ int32_t mdm_ubxlib_power_on(void);
 int32_t mdm_ubxlib_power_off(void);
 
 int32_t mdm_ubxlib_get_rssi_dbm(void);
+int32_t mdm_reset_modem(void);
 
 bool mdm_get_handle(uDeviceHandle_t *cellHandle);
-//bool mdm_ubxlib_register_connect_cb(connectedCallback cb);
+// bool mdm_ubxlib_register_connect_cb(connectedCallback cb);
 bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
-
 
 ///**
 // * @brief Power off the HL7800
 // *
 // * @return int32_t 0 for success
 // */
-//int32_t mdm_hl7800_power_off(void);
+// int32_t mdm_hl7800_power_off(void);
 //
 ///**
 // * @brief Reset the HL7800 (and allow it to reconfigure).
 // *
 // * @return int32_t 0 for success
 // */
-//int32_t mdm_hl7800_reset(void);
+// int32_t mdm_hl7800_reset(void);
 //
 ///**
 // * @brief Control the wake signals to the HL7800.
@@ -324,7 +324,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @param awake True to keep the HL7800 awake, False to allow sleep
 // */
-//void mdm_hl7800_wakeup(bool awake);
+// void mdm_hl7800_wakeup(bool awake);
 //
 ///**
 // * @brief Send an AT command to the HL7800.
@@ -333,7 +333,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param data AT command string
 // * @return int32_t 0 for success
 // */
-//int32_t mdm_hl7800_send_at_cmd(const uint8_t *data);
+// int32_t mdm_hl7800_send_at_cmd(const uint8_t *data);
 //
 ///**
 // * @brief Get the signal quality of the HL7800.
@@ -347,56 +347,56 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param sinr Signal to Interference plus Noise Ratio (dB)
 // *             Range = -128 dB to 40 dB
 // */
-//void mdm_hl7800_get_signal_quality(int *rsrp, int *sinr);
+// void mdm_hl7800_get_signal_quality(int *rsrp, int *sinr);
 //
 ///**
 // * @brief Get the SIM card ICCID
 // *
 // */
-//char *mdm_hl7800_get_iccid(void);
+// char *mdm_hl7800_get_iccid(void);
 //
 ///**
 // * @brief Get the HL7800 serial number
 // *
 // */
-//char *mdm_hl7800_get_sn(void);
+// char *mdm_hl7800_get_sn(void);
 //
 ///**
 // * @brief Get the HL7800 IMEI
 // *
 // */
-//char *mdm_hl7800_get_imei(void);
+// char *mdm_hl7800_get_imei(void);
 //
 ///**
 // * @brief Get the HL7800 firmware version
 // *
 // */
-//char *mdm_hl7800_get_fw_version(void);
+// char *mdm_hl7800_get_fw_version(void);
 //
 ///**
 // * @brief Get the IMSI
 // *
 // */
-//char *mdm_hl7800_get_imsi(void);
+// char *mdm_hl7800_get_imsi(void);
 //
 ///**
 // * @brief Update the Access Point Name in the modem.
 // *
 // * @retval 0 on success, negative on failure.
 // */
-//int32_t mdm_hl7800_update_apn(char *access_point_name);
+// int32_t mdm_hl7800_update_apn(char *access_point_name);
 //
 ///**
 // * @brief Update the Radio Access Technology (mode).
 // *
 // * @retval 0 on success, negative on failure.
 // */
-//int32_t mdm_hl7800_update_rat(enum mdm_hl7800_radio_mode value);
+// int32_t mdm_hl7800_update_rat(enum mdm_hl7800_radio_mode value);
 //
 ///**
 // * @retval true if RAT value is valid
 // */
-//bool mdm_hl7800_valid_rat(uint8_t value);
+// bool mdm_hl7800_valid_rat(uint8_t value);
 //
 ///**
 // * @brief Register a function that is called when a modem event occurs.
@@ -404,14 +404,14 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @param agent event callback agent
 // */
-//void mdm_hl7800_register_event_callback(struct mdm_hl7800_callback_agent *agent);
+// void mdm_hl7800_register_event_callback(struct mdm_hl7800_callback_agent *agent);
 //
 ///**
 // * @brief Unregister a callback event function
 // *
 // * @param agent event callback agent
 // */
-//void mdm_hl7800_unregister_event_callback(struct mdm_hl7800_callback_agent *agent);
+// void mdm_hl7800_unregister_event_callback(struct mdm_hl7800_callback_agent *agent);
 //
 ///**
 // * @brief Force modem module to generate status events.
@@ -419,7 +419,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @note This can be used to get the current state when a module initializes
 // * later than the modem.
 // */
-//void mdm_hl7800_generate_status_events(void);
+// void mdm_hl7800_generate_status_events(void);
 //
 ///**
 // * @brief Get the local time from the modem's real time clock.
@@ -428,7 +428,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param offset The amount the local time is offset from GMT/UTC in seconds.
 // * @return int32_t 0 if successful
 // */
-//int32_t mdm_hl7800_get_local_time(struct tm *tm, int32_t *offset);
+// int32_t mdm_hl7800_get_local_time(struct tm *tm, int32_t *offset);
 //
 //#ifdef CONFIG_MODEM_HL7800_FW_UPDATE
 ///**
@@ -439,7 +439,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @param 0 if successful
 // */
-//int32_t mdm_hl7800_update_fw(char *file_path);
+// int32_t mdm_hl7800_update_fw(char *file_path);
 //#endif
 //
 ///**
@@ -447,14 +447,14 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @retval negative error code, 0 on success
 // */
-//int32_t mdm_hl7800_get_operator_index(void);
+// int32_t mdm_hl7800_get_operator_index(void);
 //
 ///**
 // * @brief Get modem functionality
 // *
 // * @return int32_t negative errno on failure, else mdm_hl7800_functionality
 // */
-//int32_t mdm_hl7800_get_functionality(void);
+// int32_t mdm_hl7800_get_functionality(void);
 //
 ///**
 // * @brief Set airplane, normal, or reduced functionality mode.
@@ -466,7 +466,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param mode
 // * @return int32_t negative errno, 0 on success
 // */
-//int32_t mdm_hl7800_set_functionality(enum mdm_hl7800_functionality mode);
+// int32_t mdm_hl7800_set_functionality(enum mdm_hl7800_functionality mode);
 //
 ///**
 // * @brief When rate is non-zero: Put modem into Airplane mode. Enable GPS and
@@ -478,7 +478,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param rate in seconds to query location
 // * @return int32_t negative errno, 0 on success
 // */
-//int32_t mdm_hl7800_set_gps_rate(uint32_t rate);
+// int32_t mdm_hl7800_set_gps_rate(uint32_t rate);
 //
 ///**
 // * @brief Register modem/SIM with polte.io
@@ -490,7 +490,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @return int32_t negative errno, 0 on success
 // */
-//int32_t mdm_hl7800_polte_register(void);
+// int32_t mdm_hl7800_polte_register(void);
 //
 ///**
 // * @brief Enable PoLTE.
@@ -499,7 +499,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param password from polte.io register command callback
 // * @return int32_t negative errno, 0 on success
 // */
-//int32_t mdm_hl7800_polte_enable(char *user, char *password);
+// int32_t mdm_hl7800_polte_enable(char *user, char *password);
 //
 ///**
 // * @brief Locate device using PoLTE.
@@ -511,7 +511,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @return int32_t negative errno, 0 on success
 // */
-//int32_t mdm_hl7800_polte_locate(void);
+// int32_t mdm_hl7800_polte_locate(void);
 //
 ///**
 // * @brief Perform a site survey.  This command may return different values
@@ -521,7 +521,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @retval negative error code, 0 on success
 // */
-//int32_t mdm_hl7800_perform_site_survey(void);
+// int32_t mdm_hl7800_perform_site_survey(void);
 //
 ///**
 // * @brief Set desired sleep level. Requires MODEM_HL7800_LOW_POWER_MODE
@@ -529,7 +529,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * @param level (sleep, lite hibernate, or hibernate)
 // * @return int negative errno, 0 on success
 // */
-//int mdm_hl7800_set_desired_sleep_level(enum mdm_hl7800_sleep level);
+// int mdm_hl7800_set_desired_sleep_level(enum mdm_hl7800_sleep level);
 //
 ///**
 // * @brief Allows mapping of WAKE_UP signal
@@ -539,7 +539,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * The state parameter of the callback is 1 when modem should stay awake,
 // * 0 when modem can sleep
 // */
-//void mdm_hl7800_register_wake_test_point_callback(void (*func)(int state));
+// void mdm_hl7800_register_wake_test_point_callback(void (*func)(int state));
 //
 ///**
 // * @brief Allows mapping of P1.12_GPIO6 signal
@@ -550,7 +550,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * The state parameter of the callback follows gpio_pin_get definitions,
 // * but will default high if there is an error reading pin
 // */
-//void mdm_hl7800_register_gpio6_callback(void (*func)(int state));
+// void mdm_hl7800_register_gpio6_callback(void (*func)(int state));
 //
 ///**
 // * @brief Allows mapping of UART1_CTS signal
@@ -560,7 +560,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // * The state parameter of the callback follows gpio_pin_get definitions,
 // * but will default low if there is an error reading pin
 // */
-//void mdm_hl7800_register_cts_callback(void (*func)(int state));
+// void mdm_hl7800_register_cts_callback(void (*func)(int state));
 //
 ///**
 // * @brief Set the bands available for the LTE connection
@@ -570,7 +570,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @return int32_t negative errno, 0 on success
 // */
-//int32_t mdm_hl7800_set_bands(const char *bands);
+// int32_t mdm_hl7800_set_bands(const char *bands);
 //
 ///**
 // * @brief Set the log level for the modem.
@@ -582,7 +582,7 @@ bool mdm_ubxlib_register_network_status_cb(networkStatusCallback cb);
 // *
 // * @retval new log level
 // */
-//uint32_t mdm_hl7800_log_filter_set(uint32_t level);
+// uint32_t mdm_hl7800_log_filter_set(uint32_t level);
 
 #ifdef __cplusplus
 }
