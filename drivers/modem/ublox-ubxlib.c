@@ -32,8 +32,6 @@
 
 #include "modem_context.h"
 #include "modem_socket.h"
-//#include "modem_cmd_handler.h"
-//#include "modem_iface_uart.h"
 
 #if !defined(CONFIG_MODEM_UBLOX_SARA_R4_MANUAL_MCCMNO)
 #define CONFIG_MODEM_UBLOX_SARA_R4_MANUAL_MCCMNO ""
@@ -116,17 +114,11 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 
 NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE, 0, NULL);
 
-///* RX thread structures
-// K_KERNEL_STACK_DEFINE(modem_rx_stack,
-//		      CONFIG_MODEM_UBLOX_UBXLIB_RX_STACK_SIZE);
-// struct k_thread modem_rx_thread;
-//*/
 #if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
 /* RX thread work queue */
 K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_UBLOX_SARA_R4_RX_WORKQ_STACK_SIZE);
 static struct k_work_q modem_workq;
 #endif
-
 
 /* socket read callback data */
 struct socket_read_data {
@@ -142,12 +134,9 @@ struct modem_data {
 	uint8_t mac_addr[6];
 
 	/* modem interface */
-	// struct modem_iface_uart_data iface_data;
-	uint8_t iface_rb_buf[MDM_MAX_DATA_LENGTH];
-
-	/* modem cmds */
-	// struct modem_cmd_handler_data cmd_handler_data;
-	// uint8_t cmd_match_buf[MDM_RECV_BUF_SIZE + 1];
+	uDeviceHandle_t cellHandle;
+	uint64_t startTimeMs;
+	int32_t ubxSocketId;
 
 	/* socket data */
 	struct modem_socket_config socket_config;
@@ -189,11 +178,6 @@ struct modem_data {
 
 	/* prompt semaphore */
 	struct k_sem sem_prompt;
-
-	uDeviceHandle_t cellHandle;
-	uint64_t startTimeMs;
-
-	int32_t ubxSocketId;
 };
 
 static struct modem_data mdata;
@@ -442,12 +426,16 @@ static const uDeviceCfg_t gDeviceCfg = {
 	.transportType = U_DEVICE_TRANSPORT_TYPE_UART,
 	.transportCfg =
 		{
-			.cfgUart = {.uart = U_CFG_APP_CELL_UART,
-				    .baudRate = U_CELL_UART_BAUD_RATE,
-				    .pinTxd = U_CFG_APP_PIN_CELL_TXD,
-				    .pinRxd = U_CFG_APP_PIN_CELL_RXD,
-				    .pinCts = U_CFG_APP_PIN_CELL_CTS,
-				    .pinRts = U_CFG_APP_PIN_CELL_RTS},
+			.cfgUart =
+				{
+					.uart = U_CFG_APP_CELL_UART,
+					.baudRate = U_CELL_UART_BAUD_RATE,
+					.pinTxd = U_CFG_APP_PIN_CELL_TXD,
+					.pinRxd = U_CFG_APP_PIN_CELL_RXD,
+					.pinCts = U_CFG_APP_PIN_CELL_CTS,
+					.pinRts = U_CFG_APP_PIN_CELL_RTS,
+					.pPrefix = NULL // Relevant for Linux only
+				},
 		},
 };
 
@@ -457,97 +445,22 @@ static void modem_reset(void)
 	k_thread_system_pool_assign(k_current_get());
 
 	// Initialise the APIs we will need
+	// uPortDeinit();
 	uPortInit();
 
-#define USE_CELL 0
-	if (!USE_CELL) {
-		int32_t retVal;
+	uDeviceInit();
 
-		uDeviceInit();
-
-		retVal = uDeviceOpen(&gDeviceCfg, &mdata.cellHandle);
-		if (retVal != 0) {
-			LOG_INF("## Opened device with return code %d", retVal);
-		}
-
-		if (uCellAtClientHandleGet(mdata.cellHandle, &atHandle) == 0) {
-			// Switch AT printing off
-			// bool atPrintOn = uAtClientPrintAtGet(atHandle);
-			// LOG_INF("%d", atPrintOn);
-			uAtClientPrintAtSet(atHandle, false);
-		}
-
-	} else {
-		int32_t uartHandle;
-
-		uAtClientInit();
-		uCellInit();
-
-		// Open a UART with the recommended buffer length
-		// on your chosen UART HW block and on the pins
-		// where the cellular module's UART interface is
-		// connected to your MCU: you need to know these
-		// for your hardware, either set the #defines
-		// appropriately or replace them with the right
-		// numbers, using -1 for a pin that is not connected.
-		uartHandle = uPortUartOpen(U_CFG_APP_CELL_UART, 115200, NULL,
-					   U_CELL_UART_BUFFER_LENGTH_BYTES, U_CFG_APP_PIN_CELL_TXD,
-					   U_CFG_APP_PIN_CELL_RXD, U_CFG_APP_PIN_CELL_CTS,
-					   U_CFG_APP_PIN_CELL_RTS);
-
-		// Add an AT client on the UART with the recommended
-		// default buffer size.
-		atHandle = uAtClientAdd(uartHandle, U_AT_CLIENT_STREAM_TYPE_UART, NULL,
-					U_CELL_AT_BUFFER_LENGTH_BYTES);
-
-		// Set printing of AT commands by the cellular driver,
-		// which can be useful while debugging.
-		// uAtClientPrintAtSet(atHandle, true);
-
-		// Add a cell instance, in this case a SARA-R5 module,
-		// giving it the AT client handle and the pins where
-		// the cellular module's control interface is
-		// connected to your MCU: you need to know these for
-		// your hardware; again use -1 for "not connected".
-		uCellAdd(U_CELL_MODULE_TYPE_SARA_R5, atHandle, U_CFG_APP_PIN_CELL_ENABLE_POWER,
-			 U_CFG_APP_PIN_CELL_PWR_ON, U_CFG_APP_PIN_CELL_VINT, false,
-			 &mdata.cellHandle);
-
-		// Power up the cellular module
-		if (uCellPwrOn(mdata.cellHandle, NULL, NULL) == 0) {
-			LOG_INF("Modem powered");
-		}
-
-		pin_init();
+	int32_t retVal = uDeviceOpen(&gDeviceCfg, &mdata.cellHandle);
+	if (retVal != 0) {
+		LOG_INF("## Opened device with return code %d", retVal);
 	}
 
-	// Connect to the cellular network with all default parameters
-	// if (uCellNetConnect(cellHandle, NULL, NULL, NULL, NULL, NULL) == 0) {
-	//		// Do things, for example
-	//		if (uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer)) >= 0)
-	//{ 			LOG_INF("Registered on \"%s\"", buffer);
-	//		}
-	//		if (uCellNetGetMccMnc(cellHandle, &mcc, &mnc) == 0) {
-	//			LOG_INF("The MCC/MNC of the network is %d%d", mcc, mnc);
-	//		}
-	//		if (uCellNetGetIpAddressStr(cellHandle, buffer) >= 0) {
-	//			LOG_INF("Our IP address is \"%s\"", buffer);
-	//		}
-	//		if (uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer)) >= 0) {
-	//			LOG_INF("The APN used was \"%s\"", buffer);
-	//		}
-	//
-	//		// When finished with the connection
-	//		// uCellNetDisconnect( cellHandle, NULL );
-	//
-	//		// When finished using the module
-	//		// uCellPwrOff( cellHandle, NULL );
-	//} else {
-	//	LOG_INF("uCellPwrOn failed");
-	//}
-
-error:
-	return;
+	if (uCellAtClientHandleGet(mdata.cellHandle, &atHandle) == 0) {
+		// Switch AT printing off
+		// bool atPrintOn = uAtClientPrintAtGet(atHandle);
+		// LOG_INF("%d", atPrintOn);
+		uAtClientPrintAtSet(atHandle, false);
+	}
 }
 
 void onSocketCloseCb(void *pCbData)
@@ -1270,20 +1183,6 @@ static struct net_if_api api_funcs = {
 	.init = modem_net_iface_init,
 };
 
-// static const struct modem_cmd response_cmds[] = {
-//	MODEM_CMD("OK", on_cmd_ok, 0U, ""), /* 3GPP */
-//	MODEM_CMD("ERROR", on_cmd_error, 0U, ""), /* 3GPP */
-//	MODEM_CMD("+CME ERROR: ", on_cmd_exterror, 1U, ""),
-//	MODEM_CMD_DIRECT("@", on_prompt),
-// };
-//
-// static const struct modem_cmd unsol_cmds[] = {
-//	MODEM_CMD("+UUSOCL: ", on_cmd_socknotifyclose, 1U, ""),
-//	MODEM_CMD("+UUSORD: ", on_cmd_socknotifydata, 2U, ","),
-//	MODEM_CMD("+UUSORF: ", on_cmd_socknotifydata, 2U, ","),
-//	MODEM_CMD("+CREG: ", on_cmd_socknotifycreg, 1U, ""),
-// };
-
 static int modem_init(const struct device *dev)
 {
 	int ret;
@@ -1320,7 +1219,7 @@ static int modem_init(const struct device *dev)
 	ret = modem_context_register(&mctx);
 	if (ret < 0) {
 		LOG_ERR("SKIP: Error modem_context_register: %d", ret);
-		//goto error;
+		// goto error;
 	}
 
 #if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
@@ -1498,10 +1397,10 @@ int32_t mdm_ubxlib_get_rssi_dbm(void)
 	return uCellInfoGetRssiDbm(cellHandle);
 }
 
-int32_t mdm_reset_modem(void )
+int32_t mdm_reset_modem(void)
 {
-    modem_init(NULL);
-    return 0;
+	modem_init(NULL);
+	return 0;
 }
 
 NET_DEVICE_DT_INST_OFFLOAD_DEFINE(0, modem_init, NULL, &mdata, NULL,
