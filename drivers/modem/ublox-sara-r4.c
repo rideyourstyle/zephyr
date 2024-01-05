@@ -1371,12 +1371,6 @@ restart:
 
 error:
 	return;
-}	if (addr) {
-if (addr->sa_family == AF_INET6) {
-local_port = ntohs(net_sin6(addr)->sin6_port);
-} else if (addr->sa_family == AF_INET) {
-local_port = ntohs(net_sin(addr)->sin_port);
-}
 }
 
 /*
