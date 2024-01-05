@@ -50,7 +50,7 @@ static void thread_print_cb(struct thread_analyzer_info *info)
 
 #ifdef CONFIG_SCHED_THREAD_USAGE
 	THREAD_ANALYZER_PRINT(
-		THREAD_ANALYZER_FMT("                     : Total CPU cycles used: %llu"),
+		THREAD_ANALYZER_FMT("      : Total CPU cycles used: %llu"),
 		info->usage.total_cycles);
 
 #ifdef CONFIG_SCHED_THREAD_USAGE_ANALYSIS

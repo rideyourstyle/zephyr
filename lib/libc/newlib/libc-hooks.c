@@ -364,7 +364,7 @@ void __retarget_lock_init(_LOCK_T *lock)
 
 	/* Allocate semaphore object */
 #ifndef CONFIG_USERSPACE
-	*lock = k_malloc(sizeof(struct k_sem));
+	*lock = malloc(sizeof(struct k_sem));
 #else
 	*lock = k_object_alloc(K_OBJ_SEM);
 #endif /* !CONFIG_USERSPACE */
@@ -380,7 +380,7 @@ void __retarget_lock_init_recursive(_LOCK_T *lock)
 
 	/* Allocate mutex object */
 #ifndef CONFIG_USERSPACE
-	*lock = k_malloc(sizeof(struct k_mutex));
+	*lock = malloc(sizeof(struct k_mutex));
 #else
 	*lock = k_object_alloc(K_OBJ_MUTEX);
 #endif /* !CONFIG_USERSPACE */
@@ -394,7 +394,7 @@ void __retarget_lock_close(_LOCK_T lock)
 {
 	__ASSERT_NO_MSG(lock != NULL);
 #ifndef CONFIG_USERSPACE
-    k_free(lock);
+    free(lock);
 #else
 	k_object_release(lock);
 #endif /* !CONFIG_USERSPACE */
@@ -405,7 +405,7 @@ void __retarget_lock_close_recursive(_LOCK_T lock)
 {
 	__ASSERT_NO_MSG(lock != NULL);
 #ifndef CONFIG_USERSPACE
-    k_free(lock);
+    free(lock);
 #else
 	k_object_release(lock);
 #endif /* !CONFIG_USERSPACE */

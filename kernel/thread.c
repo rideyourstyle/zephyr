@@ -649,8 +649,6 @@ k_tid_t z_impl_k_thread_create(struct k_thread *new_thread,
 	z_setup_new_thread(new_thread, stack, stack_size, entry, p1, p2, p3,
 			  prio, options, NULL);
 
-    LOG_ERR("Create thread: %s, prio %d", new_thread->name, prio);
-
 	if (!K_TIMEOUT_EQ(delay, K_FOREVER)) {
 		schedule_new_thread(new_thread, delay);
 	}
