@@ -394,7 +394,7 @@ void __retarget_lock_close(_LOCK_T lock)
 {
 	__ASSERT_NO_MSG(lock != NULL);
 #ifndef CONFIG_USERSPACE
-    free(lock);
+	free(lock);
 #else
 	k_object_release(lock);
 #endif /* !CONFIG_USERSPACE */
@@ -405,7 +405,7 @@ void __retarget_lock_close_recursive(_LOCK_T lock)
 {
 	__ASSERT_NO_MSG(lock != NULL);
 #ifndef CONFIG_USERSPACE
-    free(lock);
+	free(lock);
 #else
 	k_object_release(lock);
 #endif /* !CONFIG_USERSPACE */
