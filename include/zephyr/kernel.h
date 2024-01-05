@@ -3829,9 +3829,6 @@ struct k_work_q {
 	uint32_t flags;
 };
 
-struct k_work_q* get_sys_wq( void );
-
-
 /* Provide the implementation for inline functions declared above */
 
 static inline bool k_work_is_pending(const struct k_work *work)

@@ -34,9 +34,4 @@ static int k_sys_work_q_init(const struct device *dev)
 	return 0;
 }
 
-struct k_work_q* get_sys_wq( void )
-{
-    return &k_sys_work_q;
-}
-
 SYS_INIT(k_sys_work_q_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
