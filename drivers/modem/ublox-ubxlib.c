@@ -64,7 +64,7 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 #include "u_cfg_app_platform_specific.h"
 #include "ubxlib.h"
 
-#include <zephyr/drivers/modem/ubxlib.h>
+#include <zephyr/drivers/modem/modem_ubxlib.h>
 
 ///* pin settings
 // static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_power_gpios);
@@ -1200,8 +1200,13 @@ static int modem_init(const struct device *dev)
 	/* socket config */
 	mdata.socket_config.sockets = &mdata.sockets[0];
 	mdata.socket_config.sockets_len = ARRAY_SIZE(mdata.sockets);
-	mdata.socket_config.base_socket_num = MDM_BASE_SOCKET_NUM;
+	//mdata.socket_config.base_socket_num = MDM_BASE_SOCKET_NUM;
 	mdata.ubxSocketId = -1;
+
+    /* socket config */
+    //ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0], ARRAY_SIZE(mdata.sockets),
+    //                        MDM_BASE_SOCKET_NUM, false, &offload_socket_fd_op_vtable);
+
 	ret = modem_socket_init(&mdata.socket_config, &offload_socket_fd_op_vtable);
 	if (ret < 0) {
 		LOG_ERR("Error modem_socket_init: %d", ret);
