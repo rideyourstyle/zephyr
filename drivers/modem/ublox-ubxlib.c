@@ -197,21 +197,28 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 	struct modem_socket *sock = (struct modem_socket *)obj;
 	struct sockaddr *dst_addr = msg->msg_name;
 	size_t buf_len = 0;
+	static uint32_t cntEnter = 0;
+	static uint32_t cntExit = 0;
 
 	if (!sock) {
 		return -EINVAL;
 	}
 
+	LOG_WRN("send_socket_data: Enter: cntEnter: %d, cntExit: %d", cntEnter, cntExit);
+	LOG_WRN("send_socket_data: mdata.ubxSocketId: %d, sock->id:", mdata.ubxSocketId, sock->id);
+
 	for (int i = 0; i < msg->msg_iovlen; i++) {
 		if (!msg->msg_iov[i].iov_base || msg->msg_iov[i].iov_len == 0) {
-			// errno = EINVAL;
+			errno = EINVAL;
 			return -1;
 		}
 		buf_len += msg->msg_iov[i].iov_len;
 	}
 
 	if (!sock->is_connected && sock->ip_proto != IPPROTO_UDP) {
-		// errno = ENOTCONN;
+		LOG_WRN("send_socket_data: sock->is_connected %d, sock->ip_proto %d",
+			sock->is_connected, sock->ip_proto);
+		errno = ENOTCONN;
 		return -1;
 	}
 
@@ -225,17 +232,17 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 	 */
 	if (buf_len > MDM_MAX_DATA_LENGTH) {
 		if (sock->type == SOCK_DGRAM) {
-			// errno = EMSGSIZE;
-			retVal = -1;
-			goto exit;
+			errno = EMSGSIZE;
+			return -1;
 		}
-
+		LOG_WRN("send_socket_data: Limit max data length to %d", MDM_MAX_DATA_LENGTH);
 		buf_len = MDM_MAX_DATA_LENGTH;
 	}
 
 	mdata.sock_written = 0;
 
 	if (sock->ip_proto == IPPROTO_UDP) {
+		// TODO: implement UDP
 		//		char ip_str[NET_IPV6_ADDR_LEN];
 		//
 		//		ret = modem_context_sprint_ip_addr(dst_addr, ip_str,
@@ -254,21 +261,26 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 
 	} else {
 		for (int i = 0; i < msg->msg_iovlen; i++) {
+			uint8_t chunkCounter = 0;
 			int len = MIN(buf_len, msg->msg_iov[i].iov_len);
+
+			LOG_INF("send_socket_data: [%02d] uSockWrite with len: %d", chunkCounter++,
+				len);
 
 			if (len == 0) {
 				break;
 			}
-			int32_t writtenBytes =
-				uSockWrite(mdata.ubxSocketId, msg->msg_iov[i].iov_base, len);
-			if (writtenBytes >= 0) {
-				mdata.sock_written += writtenBytes;
+			retVal = uSockWrite(mdata.ubxSocketId, msg->msg_iov[i].iov_base, len);
+			if (retVal < 0) {
+				LOG_ERR("send_socket_data: uSockWrite returned with %d", retVal);
+			} else {
+				mdata.sock_written += retVal;
 			}
 			buf_len -= len;
 		}
 	}
 
-exit:
+	// in case an error happens
 	if (retVal < 0) {
 		return retVal;
 	}
@@ -579,8 +591,9 @@ static int offload_close(void *obj)
 
 	static uint32_t cntEnter = 0;
 	static uint32_t cntExit = 0;
-	LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter, cntExit);
-	LOG_WRN("Close mdata.ubxSocketId: %d", mdata.ubxSocketId);
+	LOG_WRN("offload_close: Enter: cntEnter: %d, cntExit: %d", cntEnter, cntExit);
+	LOG_WRN("offload_close: mdata.ubxSocketId: %d, sock->id: %d", mdata.ubxSocketId, sock->id);
+	k_sleep(K_MSEC(1));
 
 	/* make sure we assigned an id */
 	if (sock->id < mdata.socket_config.base_socket_num) {
@@ -588,20 +601,19 @@ static int offload_close(void *obj)
 			mdata.socket_config.base_socket_num);
 		return 0;
 	}
-	LOG_WRN("Enter static int offload_close (%d/%d)", cntEnter++, cntExit);
+
+	LOG_WRN("offload_close: Proceed: cntEnter: %d, cntExit: %d", ++cntEnter, cntExit);
 
 	if (sock->is_connected || sock->ip_proto == IPPROTO_UDP) {
-		LOG_WRN("sock->is_connected (%d), sock->ip_proto (%d)", sock->is_connected,
-			sock->ip_proto);
 
 		retVal = uSockShutdown(mdata.ubxSocketId, U_SOCK_SHUTDOWN_READ_WRITE);
 		if (retVal != 0) {
-			LOG_ERR("offload_close:uSockShutdown failed (%d)", retVal);
+			LOG_ERR("offload_close: uSockShutdown failed (%d)", retVal);
 		}
 
 		retVal = uSockClose(mdata.ubxSocketId);
 		if (retVal != 0) {
-			LOG_ERR("offload_close:uSockClose failed (%d)", retVal);
+			LOG_ERR("offload_close: uSockClose failed (%d)", retVal);
 		}
 
 		uSockCleanUp();
@@ -609,7 +621,7 @@ static int offload_close(void *obj)
 
 	modem_socket_put(&mdata.socket_config, sock->sock_fd);
 
-	LOG_WRN("Exit static int offload_close (%d/%d)", cntEnter, cntExit++);
+	LOG_WRN("offload_close: Exit: cntEnter: %d, cntExit: %d", cntEnter, ++cntExit);
 
 	return retVal;
 }
@@ -636,8 +648,9 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	struct modem_socket *sock = (struct modem_socket *)obj;
 	uSockAddress_t address = {0};
 
-	if (!addr) {
-		// errno = EINVAL;
+	if (addr == NULL) {
+		LOG_ERR("offload_connect: addr == NULL");
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -645,7 +658,7 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 
 	int retVal = create_socket(sock, NULL);
 	if (retVal != 0) {
-		LOG_ERR("create_socket() failed: %d", retVal);
+		LOG_ERR("offload_connect: create_socket returned with: %d", retVal);
 		return -1;
 	}
 
@@ -655,13 +668,13 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	} else if (addr->sa_family == AF_INET) {
 		address.port = ntohs(net_sin(addr)->sin_port);
 	} else {
-		// errno = EAFNOSUPPORT;
+		errno = EAFNOSUPPORT;
 		return -1;
 	}
 
 	/* skip socket connect if UDP */
 	if (sock->ip_proto == IPPROTO_UDP) {
-		// errno = 0;
+		errno = 0;
 		return 0;
 	}
 
@@ -669,23 +682,23 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 	address.ipAddress.address.ipv4 = (addr->data[2] << 24) + (addr->data[3] << 16) +
 					 (addr->data[4] << 8) + (addr->data[5] << 0);
 
-	LOG_INF("Connect via mdata.ubxSocketId %d", mdata.ubxSocketId);
+	LOG_INF("offload_connect: mdata.ubxSocketId: %d", mdata.ubxSocketId);
+	k_sleep(K_MSEC(1));
+
 	if (mdata.ubxSocketId < 0) {
-		LOG_ERR("No valid ubxSocketId: %d", mdata.ubxSocketId);
+		LOG_ERR("offload_connect: No valid socket Id: %d", mdata.ubxSocketId);
 		return -1;
 	}
+
 	retVal = uSockConnect(mdata.ubxSocketId, &address);
 	if (retVal != 0) {
-		LOG_ERR("uSockConnect() failed");
+		LOG_ERR("offload_connect: uSockConnect returned with %d", retVal);
+		errno = ENOTCONN;
 		return -1;
 	}
 
 	sock->is_connected = true;
-
-	if (sock->id != mdata.ubxSocketId) {
-		LOG_WRN("sock->id != mdata.ubxSocketId (%d != %d)", sock->id, mdata.ubxSocketId);
-	}
-	// errno = 0;
+	errno = 0;
 	return 0;
 }
 
@@ -964,10 +977,12 @@ static int map_credentials(struct modem_socket *sock, const void *optval, sockle
 	return 0;
 }
 #else
+
 static int map_credentials(struct modem_socket *sock, const void *optval, socklen_t optlen)
 {
 	return -EINVAL;
 }
+
 #endif
 
 static int offload_setsockopt(void *obj, int level, int optname, const void *optval,
@@ -1052,9 +1067,8 @@ static int offload_getaddrinfo(const char *node, const char *service,
 	LOG_ERR("UBX_LIB DNS-LOOKUP");
 	static uint8_t test = 0;
 	test++;
-	//	static const struct modem_cmd cmd = MODEM_CMD("+UDNSRN: ", on_cmd_dns, 1U, ",");
-	//	uint32_t port = 0U;
-	//	int ret;
+	//	static const struct modem_cmd cmd = MODEM_CMD("+UDNSRN: ", on_cmd_dns, 1U,
+	//","); 	uint32_t port = 0U; 	int ret;
 	//	/* DNS command + 128 bytes for domain name parameter */
 	//	char sendbuf[sizeof("AT+UDNSRN=#,'[]'\r") + 128];
 	//
@@ -1097,11 +1111,12 @@ static int offload_getaddrinfo(const char *node, const char *service,
 	//
 	//	snprintk(sendbuf, sizeof(sendbuf), "AT+UDNSRN=0,\"%s\"", node);
 	//	ret = modem_cmd_send(&mctx.iface, &mctx.cmd_handler, &cmd, 1U, sendbuf,
-	//&mdata.sem_response, 			     MDM_DNS_TIMEOUT); 	if (ret < 0) { return ret;
+	//&mdata.sem_response, 			     MDM_DNS_TIMEOUT); 	if (ret < 0) {
+	// return ret;
 	//	}
 	//
 	//	LOG_DBG("DNS RESULT: %s", net_addr_ntop(result.ai_family,
-	//&net_sin(&result_addr)->sin_addr, 						sendbuf,
+	//&net_sin(&result_addr)->sin_addr, sendbuf,
 	// NET_IPV4_ADDR_LEN));
 	//
 	//	*res = (struct zsock_addrinfo *)&result;
@@ -1133,6 +1148,7 @@ static struct net_offload modem_net_offload = {
 };
 
 #define HASH_MULTIPLIER 37
+
 static uint32_t hash32(char *str, int len)
 {
 	uint32_t h = 0;
@@ -1200,12 +1216,14 @@ static int modem_init(const struct device *dev)
 	/* socket config */
 	mdata.socket_config.sockets = &mdata.sockets[0];
 	mdata.socket_config.sockets_len = ARRAY_SIZE(mdata.sockets);
-	//mdata.socket_config.base_socket_num = MDM_BASE_SOCKET_NUM;
+	// mdata.socket_config.base_socket_num = MDM_BASE_SOCKET_NUM;
 	mdata.ubxSocketId = -1;
 
-    /* socket config */
-    //ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0], ARRAY_SIZE(mdata.sockets),
-    //                        MDM_BASE_SOCKET_NUM, false, &offload_socket_fd_op_vtable);
+	/* socket config */
+	// ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0],
+	// ARRAY_SIZE(mdata.sockets),
+	//                         MDM_BASE_SOCKET_NUM, false,
+	//                         &offload_socket_fd_op_vtable);
 
 	ret = modem_socket_init(&mdata.socket_config, &offload_socket_fd_op_vtable);
 	if (ret < 0) {
