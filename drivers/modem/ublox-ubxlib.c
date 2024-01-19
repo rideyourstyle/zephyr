@@ -47,11 +47,13 @@
 #define SARA_N_POWER_ID DT_NODELABEL(do_sara_n_power)
 #define SARA_RESET_ID	DT_NODELABEL(do_sara_reset)
 
-#define U_PORT_UART_MAX_NUM		1
-#define U_CFG_APP_CELL_UART		0
-#define U_CFG_APP_PIN_CELL_PWR_ON	-1 // 2 * 32 + 8
-#define U_CFG_APP_PIN_CELL_ENABLE_POWER -1 // 2 * 32 + 9
-#define U_CFG_APP_PIN_CELL_VINT		-1 // 0
+#define U_PORT_UART_MAX_NUM 1
+#define U_CFG_APP_CELL_UART 0
+
+#define U_CFG_APP_PIN_CELL_PWR_ON	-1
+#define U_CFG_APP_PIN_CELL_ENABLE_POWER -1
+#define U_CFG_APP_PIN_CELL_VINT -1
+#define U_CFG_APP_PIN_CELL_DTR		-1
 
 #include <zephyr/logging/log.h>
 
@@ -66,15 +68,23 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 
 #include <zephyr/drivers/modem/modem_ubxlib.h>
 
-///* pin settings
-// static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_power_gpios);
-//#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
-// static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_reset_gpios);
-//#endif
-//#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
-// static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
-//#endif
-//*/
+// pin settings
+#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
+static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_reset_gpios);
+#endif
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_vcc_gpios)
+static const struct gpio_dt_spec vcc_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vcc_gpios);
+#endif
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_power_on_gpios)
+static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_power_on_gpios);
+#endif
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
+static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
+#endif
+
 //#define MDM_UART_NODE DT_INST_BUS(0)
 //#define MDM_UART_DEV  DEVICE_DT_GET(MDM_UART_NODE)
 
@@ -352,6 +362,14 @@ exit:
 static int pin_init(void)
 {
 	LOG_INF("Setting Modem Pins");
+	//gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&vcc_gpio, GPIO_OUTPUT);
+	//gpio_pin_configure_dt(&power_on_gpio, GPIO_OUTPUT);
+
+    gpio_pin_set_dt(&vcc_gpio, 1);
+    //gpio_pin_set_dt(&power_on_gpio, 1);
+    //gpio_pin_set_dt(&reset_gpio, 0);
+
 	//  TODO: finish me...
 	//#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
 	//	LOG_DBG("MDM_RESET_PIN -> NOT_ASSERTED");
@@ -359,18 +377,18 @@ static int pin_init(void)
 	//#endif
 	//
 	//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
-	//	gpio_pin_set_dt(&power_gpio, 1);
+	//	gpio_pin_set_dt(&power_on_gpio, 1);
 	//	k_sleep(K_SECONDS(4));
 	//
 	//	LOG_DBG("MDM_POWER_PIN -> DISABLE");
-	//	gpio_pin_set_dt(&power_gpio, 0);
+	//	gpio_pin_set_dt(&power_on_gpio, 0);
 	//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
 	//	k_sleep(K_SECONDS(1));
 	//#else
 	//	k_sleep(K_SECONDS(4));
 	//#endif
 	//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
-	//	gpio_pin_set_dt(&power_gpio, 1);
+	//	gpio_pin_set_dt(&power_on_gpio, 1);
 	//	k_sleep(K_SECONDS(1));
 	//
 	//	/* make sure module is powered off */
@@ -391,33 +409,33 @@ static int pin_init(void)
 	//#else
 	//	k_sleep(K_SECONDS(8));
 	//#endif
-	//
-	//	LOG_DBG("MDM_POWER_PIN -> DISABLE");
-	//
-	//	unsigned int irq_lock_key = irq_lock();
-	//
-	//	gpio_pin_set_dt(&power_gpio, 0);
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
-	//	k_usleep(50);		/* 50-80 microseconds */
-	//#else
-	//	k_sleep(K_SECONDS(1));
-	//#endif
-	//	gpio_pin_set_dt(&power_gpio, 1);
-	//
-	//	irq_unlock(irq_lock_key);
-	//
-	//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
-	//
-	//#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
-	//	LOG_DBG("Waiting for MDM_VINT_PIN = 1");
-	//	do {
-	//		k_sleep(K_MSEC(100));
-	//	} while (gpio_pin_get_dt(&vint_gpio) == 0);
-	//#else
-	//	k_sleep(K_SECONDS(10));
-	//#endif
-	//
-	//	gpio_pin_configure_dt(&power_gpio, GPIO_INPUT);
+//
+//	LOG_DBG("MDM_POWER_PIN -> DISABLE");
+//
+//	unsigned int irq_lock_key = irq_lock();
+//
+//	gpio_pin_set_dt(&power_on_gpio, 0);
+//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
+//	k_usleep(50); /* 50-80 microseconds */
+//#else
+//	k_sleep(K_SECONDS(1));
+//#endif
+//	gpio_pin_set_dt(&power_on_gpio, 1);
+//
+//	irq_unlock(irq_lock_key);
+//
+//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
+//
+//#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
+//	LOG_DBG("Waiting for MDM_VINT_PIN = 1");
+//	do {
+//		k_sleep(K_MSEC(100));
+//	} while (gpio_pin_get_dt(&vint_gpio) == 0);
+//#else
+//	k_sleep(K_SECONDS(10));
+//#endif
+//
+//	//gpio_pin_configure_dt(&power_on_gpio, GPIO_INPUT);
 
 	LOG_INF("... Done!");
 
@@ -428,12 +446,15 @@ static const uDeviceCfg_t gDeviceCfg = {
 	.deviceType = U_DEVICE_TYPE_CELL,
 	.deviceCfg =
 		{
-			.cfgCell = {.moduleType = U_CELL_MODULE_TYPE_SARA_R5,
-				    .pSimPinCode = NULL, /* SIM pin */
-				    .pinEnablePower = U_CFG_APP_PIN_CELL_ENABLE_POWER,
-				    .pinPwrOn = U_CFG_APP_PIN_CELL_PWR_ON,
-				    .pinVInt = U_CFG_APP_PIN_CELL_VINT,
-				    .pinDtrPowerSaving = U_CFG_APP_PIN_CELL_DTR},
+			.cfgCell =
+				{
+					.moduleType = U_CELL_MODULE_TYPE_SARA_R5,
+					.pSimPinCode = NULL, /* SIM pin */
+					.pinEnablePower = U_CFG_APP_PIN_CELL_ENABLE_POWER,
+					.pinPwrOn = U_CFG_APP_PIN_CELL_PWR_ON,
+					.pinVInt = U_CFG_APP_PIN_CELL_VINT,
+					.pinDtrPowerSaving = U_CFG_APP_PIN_CELL_DTR,
+				},
 		},
 	.transportType = U_DEVICE_TRANSPORT_TYPE_UART,
 	.transportCfg =
@@ -446,7 +467,7 @@ static const uDeviceCfg_t gDeviceCfg = {
 					.pinRxd = U_CFG_APP_PIN_CELL_RXD,
 					.pinCts = U_CFG_APP_PIN_CELL_CTS,
 					.pinRts = U_CFG_APP_PIN_CELL_RTS,
-					.pPrefix = NULL // Relevant for Linux only
+					.pPrefix = NULL, // Relevant for Linux only
 				},
 		},
 };
@@ -458,6 +479,8 @@ static void modem_reset(void)
 
 	// Initialise the APIs we will need
 	// uPortDeinit();
+
+	pin_init();
 	uPortInit();
 
 	uDeviceInit();
@@ -1271,12 +1294,11 @@ bool keepGoingCallback(uDeviceHandle_t cellHandle)
 
 bool mdm_get_handle(uDeviceHandle_t *cellHandle)
 {
-	if (mdata.cellHandle != NULL) {
-		*cellHandle = mdata.cellHandle;
-		return true;
-	} else {
+	if (mdata.cellHandle == NULL) {
 		return false;
 	}
+	*cellHandle = mdata.cellHandle;
+    return true;
 }
 
 // bool mdm_ubxlib_register_connect_cb(connectedCallback cb)
@@ -1382,12 +1404,12 @@ int32_t mdm_ubxlib_power_on(void)
 	uDeviceHandle_t cellHandle = mdata.cellHandle;
 
 	if (cellHandle == NULL) {
-		LOG_ERR("Cell handle not registered");
+		LOG_ERR("mdm_ubxlib_power_on: cellHandle not registered");
 		return U_ERROR_COMMON_PLATFORM;
 	}
 
 	if (uCellPwrOn(mdata.cellHandle, NULL, NULL) != 0) {
-		LOG_ERR("uCellPwrOn failed");
+		LOG_ERR("mdm_ubxlib_power_on uCellPwrOn() failed");
 		return U_ERROR_COMMON_PLATFORM;
 	}
 
@@ -1399,12 +1421,12 @@ int32_t mdm_ubxlib_power_off(void)
 	uDeviceHandle_t cellHandle = mdata.cellHandle;
 
 	if (cellHandle == NULL) {
-		LOG_ERR("Cell handle not registered");
+		LOG_ERR("mdm_ubxlib_power_off: cellHandle not registered");
 		return U_ERROR_COMMON_PLATFORM;
 	}
 
 	if (uCellPwrOff(mdata.cellHandle, NULL) != 0) {
-		LOG_ERR("uCellPwrOn failed");
+		LOG_ERR("mdm_ubxlib_power_off uCellPwrOff() failed");
 		return U_ERROR_COMMON_PLATFORM;
 	}
 

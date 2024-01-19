@@ -8,11 +8,15 @@ compatible: "u-blox,ubxlib"
 include: uart-device.yaml
 
 properties:
-    mdm-power-gpios:
-      type: phandle-array
-      required: true
-
     mdm-reset-gpios:
+      type: phandle-array
+      required: false
+
+    mdm-vcc-gpios:
+      type: phandle-array
+      required: false
+
+    mdm-power-on-gpios:
       type: phandle-array
       required: false
 
