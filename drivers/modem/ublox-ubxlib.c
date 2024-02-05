@@ -9,9 +9,9 @@
 #define U_DEVICE_PRIVATE_I2C_MAX_NUM	    0
 #define U_DEVICE_PRIVATE_DEVICE_I2C_MAX_NUM 0
 
-//#define U_CFG_OS_APP_TASK_PRIORITY	   4
-//#define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
-//#define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
+// #define U_CFG_OS_APP_TASK_PRIORITY	   4
+// #define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
+// #define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
 
 #include <ctype.h>
 #include <errno.h>
@@ -52,7 +52,7 @@
 
 #define U_CFG_APP_PIN_CELL_PWR_ON	-1
 #define U_CFG_APP_PIN_CELL_ENABLE_POWER -1
-#define U_CFG_APP_PIN_CELL_VINT -1
+#define U_CFG_APP_PIN_CELL_VINT		-1
 #define U_CFG_APP_PIN_CELL_DTR		-1
 
 #include <zephyr/logging/log.h>
@@ -85,8 +85,8 @@ static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_po
 static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
 #endif
 
-//#define MDM_UART_NODE DT_INST_BUS(0)
-//#define MDM_UART_DEV  DEVICE_DT_GET(MDM_UART_NODE)
+// #define MDM_UART_NODE DT_INST_BUS(0)
+// #define MDM_UART_DEV  DEVICE_DT_GET(MDM_UART_NODE)
 
 #define MDM_RESET_NOT_ASSERTED 1
 #define MDM_RESET_ASSERTED     0
@@ -106,9 +106,9 @@ static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_g
 #define MDM_MAX_SOCKETS	    6
 #define MDM_BASE_SOCKET_NUM 0
 
-//#define MDM_NETWORK_RETRY_COUNT 3
-//#define MDM_WAIT_FOR_RSSI_COUNT 10
-//#define MDM_WAIT_FOR_RSSI_DELAY K_SECONDS(2)
+// #define MDM_NETWORK_RETRY_COUNT 3
+// #define MDM_WAIT_FOR_RSSI_COUNT 10
+// #define MDM_WAIT_FOR_RSSI_DELAY K_SECONDS(2)
 
 #define MDM_MANUFACTURER_LENGTH 10
 #define MDM_MODEL_LENGTH	16
@@ -117,10 +117,10 @@ static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_g
 #define MDM_IMSI_LENGTH		16
 #define MDM_APN_LENGTH		32
 #define MDM_MAX_CERT_LENGTH	8192
-//#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-//#define MDM_VARIANT_UBLOX_R4 4
-//#define MDM_VARIANT_UBLOX_U2 2
-//#endif
+// #if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
+// #define MDM_VARIANT_UBLOX_R4 4
+// #define MDM_VARIANT_UBLOX_U2 2
+// #endif
 
 NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE, 0, NULL);
 
@@ -362,19 +362,22 @@ exit:
 static int pin_init(void)
 {
 	LOG_INF("Setting Modem Pins");
-	//gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT);
 	gpio_pin_configure_dt(&vcc_gpio, GPIO_OUTPUT);
-	//gpio_pin_configure_dt(&power_on_gpio, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&power_on_gpio, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&vint_gpio, GPIO_INPUT);
 
-    gpio_pin_set_dt(&vcc_gpio, 1);
-    //gpio_pin_set_dt(&power_on_gpio, 1);
-    //gpio_pin_set_dt(&reset_gpio, 0);
+	k_sleep(K_MSEC(1));
+
+	gpio_pin_set_dt(&vcc_gpio, 1);	    // 3.3 V
+	gpio_pin_set_dt(&power_on_gpio, 1); // 3.3 V
+	gpio_pin_set_dt(&reset_gpio, 0);    // 3.3 V
 
 	//  TODO: finish me...
-	//#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
+	// #if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
 	//	LOG_DBG("MDM_RESET_PIN -> NOT_ASSERTED");
 	//	gpio_pin_set_dt(&reset_gpio, MDM_RESET_NOT_ASSERTED);
-	//#endif
+	// #endif
 	//
 	//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
 	//	gpio_pin_set_dt(&power_on_gpio, 1);
@@ -382,63 +385,63 @@ static int pin_init(void)
 	//
 	//	LOG_DBG("MDM_POWER_PIN -> DISABLE");
 	//	gpio_pin_set_dt(&power_on_gpio, 0);
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
+	// #if defined(CONFIG_MODEM_UBLOX_SARA_U2)
 	//	k_sleep(K_SECONDS(1));
-	//#else
+	// #else
 	//	k_sleep(K_SECONDS(4));
-	//#endif
+	// #endif
 	//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
 	//	gpio_pin_set_dt(&power_on_gpio, 1);
 	//	k_sleep(K_SECONDS(1));
 	//
 	//	/* make sure module is powered off */
-	//#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
+	// #if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
 	//	LOG_DBG("Waiting for MDM_VINT_PIN = 0");
 	//
 	//	while (gpio_pin_get_dt(&vint_gpio) > 0) {
-	//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
+	// #if defined(CONFIG_MODEM_UBLOX_SARA_U2)
 	//		/* try to power off again */
 	//		LOG_DBG("MDM_POWER_PIN -> DISABLE");
 	//		gpio_pin_set_dt(&power_gpio, 0);
 	//		k_sleep(K_SECONDS(1));
 	//		LOG_DBG("MDM_POWER_PIN -> ENABLE");
 	//		gpio_pin_set_dt(&power_gpio, 1);
-	//#endif
+	// #endif
 	//		k_sleep(K_MSEC(100));
 	//	}
-	//#else
+	// #else
 	//	k_sleep(K_SECONDS(8));
-	//#endif
-//
-//	LOG_DBG("MDM_POWER_PIN -> DISABLE");
-//
-//	unsigned int irq_lock_key = irq_lock();
-//
-//	gpio_pin_set_dt(&power_on_gpio, 0);
-//#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
-//	k_usleep(50); /* 50-80 microseconds */
-//#else
-//	k_sleep(K_SECONDS(1));
-//#endif
-//	gpio_pin_set_dt(&power_on_gpio, 1);
-//
-//	irq_unlock(irq_lock_key);
-//
-//	LOG_DBG("MDM_POWER_PIN -> ENABLE");
-//
-//#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
-//	LOG_DBG("Waiting for MDM_VINT_PIN = 1");
-//	do {
-//		k_sleep(K_MSEC(100));
-//	} while (gpio_pin_get_dt(&vint_gpio) == 0);
-//#else
-//	k_sleep(K_SECONDS(10));
-//#endif
-//
-//	//gpio_pin_configure_dt(&power_on_gpio, GPIO_INPUT);
+	// #endif
+	//
 
-	LOG_INF("... Done!");
+	LOG_DBG("pin_init: setup pins");
 
+	unsigned int irq_lock_key = irq_lock();
+
+	gpio_pin_set_dt(&power_on_gpio, 0);
+#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
+	k_usleep(50); /* 50-80 microseconds */
+#else
+	k_sleep(K_SECONDS(1));
+#endif
+	gpio_pin_set_dt(&power_on_gpio, 1);
+
+	irq_unlock(irq_lock_key);
+
+	LOG_DBG("MDM_POWER_PIN -> ENABLE");
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
+	LOG_DBG("Waiting for MDM_VINT_PIN = 1");
+	do {
+		k_sleep(K_MSEC(100));
+	} while (gpio_pin_get_dt(&vint_gpio) == 0);
+#else
+	k_sleep(K_SECONDS(10));
+#endif
+
+	// gpio_pin_configure_dt(&power_on_gpio, GPIO_INPUT);
+
+	LOG_DBG("pin_init: setup pins done");
 	return 0;
 }
 
@@ -1298,7 +1301,7 @@ bool mdm_get_handle(uDeviceHandle_t *cellHandle)
 		return false;
 	}
 	*cellHandle = mdata.cellHandle;
-    return true;
+	return true;
 }
 
 // bool mdm_ubxlib_register_connect_cb(connectedCallback cb)
