@@ -1445,6 +1445,13 @@ int32_t mdm_ubxlib_get_rssi_dbm(void)
 	return uCellInfoGetRssiDbm(cellHandle);
 }
 
+int64_t mdm_ubxlib_get_time_UTC(void)
+{
+	uDeviceHandle_t cellHandle = mdata.cellHandle;
+
+	return uCellInfoGetTimeUtc(cellHandle);
+}
+
 int32_t mdm_reset_modem(void)
 {
 	modem_init(NULL);

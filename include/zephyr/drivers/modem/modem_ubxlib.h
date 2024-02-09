@@ -296,7 +296,7 @@ int32_t mdm_ubxlib_power_on(void);
  * @return int32_t 0 for success
  */
 int32_t mdm_ubxlib_power_off(void);
-
+int64_t mdm_ubxlib_get_time_UTC(void);
 int32_t mdm_ubxlib_get_rssi_dbm(void);
 int32_t mdm_reset_modem(void);
 
