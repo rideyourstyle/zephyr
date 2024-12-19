@@ -203,7 +203,6 @@ static char result_canonname[DNS_MAX_NAME_SIZE + 1];
 static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t timeout)
 {
 	int32_t retVal = 0;
-	uint16_t dst_port = 0U;
 	struct modem_socket *sock = (struct modem_socket *)obj;
 	struct sockaddr *dst_addr = msg->msg_name;
 	size_t buf_len = 0;
@@ -215,7 +214,7 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 	}
 
 	LOG_WRN("send_socket_data: Enter: cntEnter: %d, cntExit: %d", cntEnter, cntExit);
-	LOG_WRN("send_socket_data: mdata.ubxSocketId: %d, sock->id:", mdata.ubxSocketId, sock->id);
+	LOG_WRN("send_socket_data: mdata.ubxSocketId: %d, sock->id: %d", mdata.ubxSocketId, sock->id);
 
 	for (int i = 0; i < msg->msg_iovlen; i++) {
 		if (!msg->msg_iov[i].iov_base || msg->msg_iov[i].iov_len == 0) {
@@ -253,20 +252,21 @@ static ssize_t send_socket_data(void *obj, const struct msghdr *msg, k_timeout_t
 
 	if (sock->ip_proto == IPPROTO_UDP) {
 		// TODO: implement UDP
-		//		char ip_str[NET_IPV6_ADDR_LEN];
+		// uint16_t dst_port = 0U;
+		// char ip_str[NET_IPV6_ADDR_LEN];
 		//
-		//		ret = modem_context_sprint_ip_addr(dst_addr, ip_str,
+		// ret = modem_context_sprint_ip_addr(dst_addr, ip_str,
 		// sizeof(ip_str)); 		if (ret != 0) { uPortLog("Error formatting IP string
 		// %d", ret); 			goto exit;
-		//		}
+		//}
 		//
-		//		ret = modem_context_get_addr_port(dst_addr, &dst_port);
-		//		if (ret != 0) {
-		//			uPortLog("Error getting port from IP address %d", ret);
-		//			goto exit;
-		//		}
+		// ret = modem_context_get_addr_port(dst_addr, &dst_port);
+		// if (ret != 0) {
+		//	uPortLog("Error getting port from IP address %d", ret);
+		//	goto exit;
+		// }
 		//
-		//		snprintk(send_buf, sizeof(send_buf), "AT+USOST=%d,\"%s\",%u,%zu",
+		// snprintk(send_buf, sizeof(send_buf), "AT+USOST=%d,\"%s\",%u,%zu",
 		// sock->id, ip_str, 			 dst_port, buf_len);
 
 	} else {
@@ -534,7 +534,7 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr)
 		LOG_ERR("uSockCreate failed: %d", retVal);
 		goto error;
 	}
-	LOG_INF("Create socket with ubx id:", retVal);
+	LOG_INF("Create socket with ubx id: %d", retVal);
 	mdata.ubxSocketId = retVal;
 
 	uSockRegisterCallbackData(retVal, onDataReceivedCb, &mdata.ubxSocketId);
@@ -1318,17 +1318,13 @@ void networkStatusCb(uDeviceHandle_t devHandle, uNetworkType_t netType, bool isU
 	if (mdata.networkStatusCallback != NULL) {
 		mdata.networkStatusCallback(pStatus);
 	}
-	LOG_DBG("devHandle: %d", devHandle);
+	LOG_DBG("devHandle: %p", devHandle);
 	LOG_DBG("netType:   %d", netType);
 	LOG_DBG("isUp:      %d", isUp);
-	LOG_DBG("pStatus:   %d", pStatus);
 }
 
 int32_t mdm_ubxlib_bring_interface_up(const void *pCfg)
 {
-	char buffer[U_CELL_NET_IP_ADDRESS_SIZE];
-	int32_t mcc;
-	int32_t mnc;
 	uDeviceHandle_t cellHandle = mdata.cellHandle;
 
 	if (cellHandle == NULL) {
@@ -1349,14 +1345,17 @@ int32_t mdm_ubxlib_bring_interface_up(const void *pCfg)
 		LOG_WRN("uNetworkSetStatusCallback failed");
 	}
 
-	//	uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer));
-	//	uCellNetGetMccMnc(cellHandle, &mcc, &mnc);
-	//	uCellNetGetIpAddressStr(cellHandle, buffer);
-	//	uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer));
+	// int32_t mcc;
+	// int32_t mnc;
+	// char buffer[U_CELL_NET_IP_ADDRESS_SIZE];
+	// uCellNetGetOperatorStr(cellHandle, buffer, sizeof(buffer));
+	// uCellNetGetMccMnc(cellHandle, &mcc, &mnc);
+	// uCellNetGetIpAddressStr(cellHandle, buffer);
+	// uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer));
 
-	//	if (mdata.connectedCallback != NULL) {
-	//		mdata.connectedCallback();
-	//	}
+	// if (mdata.connectedCallback != NULL) {
+	//	mdata.connectedCallback();
+	// }
 	return U_ERROR_COMMON_SUCCESS;
 }
 
