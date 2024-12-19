@@ -622,9 +622,7 @@ static int offload_close(void *obj)
 	k_sleep(K_MSEC(1));
 
 	/* make sure we assigned an id */
-	if (sock->id < mdata.socket_config.base_socket_num) {
-		LOG_WRN("sock->id < mdata.socket_config.base_socket_num (%d < %d)", sock->id,
-			mdata.socket_config.base_socket_num);
+	if (modem_socket_id_is_assigned(&mdata.socket_config, sock) == false) {
 		return 0;
 	}
 
@@ -1246,12 +1244,10 @@ static int modem_init(const struct device *dev)
 	mdata.ubxSocketId = -1;
 
 	/* socket config */
-	// ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0],
-	// ARRAY_SIZE(mdata.sockets),
-	//                         MDM_BASE_SOCKET_NUM, false,
-	//                         &offload_socket_fd_op_vtable);
+	ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0], ARRAY_SIZE(mdata.sockets),
+				MDM_BASE_SOCKET_NUM, false, &offload_socket_fd_op_vtable);
 
-	ret = modem_socket_init(&mdata.socket_config, &offload_socket_fd_op_vtable);
+	// ret = modem_socket_init(&mdata.socket_config, &offload_socket_fd_op_vtable);
 	if (ret < 0) {
 		LOG_ERR("Error modem_socket_init: %d", ret);
 		goto error;
