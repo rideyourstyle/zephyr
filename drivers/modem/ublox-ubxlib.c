@@ -12,7 +12,6 @@
 // #define U_CFG_OS_APP_TASK_PRIORITY	   4
 // #define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
 // #define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
-#define U_AT_CLIENT_URC_TASK_STACK_SIZE_BYTES 1024
 
 #include <ctype.h>
 #include <errno.h>
@@ -744,8 +743,6 @@ static ssize_t offload_recvfrom(void *obj, void *buf, size_t len, int flags, str
 		return -1;
 	}
 
-	// next_packet_size = modem_socket_next_packet_size(&mdata.socket_config, sock);
-	// if (!next_packet_size) {
 	if (flags & ZSOCK_MSG_DONTWAIT) {
 		// errno = EAGAIN;
 		return -1;
