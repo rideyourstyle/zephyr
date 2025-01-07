@@ -12,6 +12,7 @@
 // #define U_CFG_OS_APP_TASK_PRIORITY	   4
 // #define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
 // #define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
+#define U_AT_CLIENT_URC_TASK_STACK_SIZE_BYTES 1024
 
 #include <ctype.h>
 #include <errno.h>
@@ -1048,15 +1049,19 @@ static const struct socket_op_vtable offload_socket_fd_op_vtable = {
 			.close = offload_close,
 			.ioctl = offload_ioctl,
 		},
+	.shutdown = NULL,
 	.bind = offload_bind,
 	.connect = offload_connect,
-	.sendto = offload_sendto,
-	.recvfrom = offload_recvfrom,
 	.listen = NULL,
 	.accept = NULL,
-	.sendmsg = offload_sendmsg,
+	.sendto = offload_sendto,
+	.recvfrom = offload_recvfrom,
 	.getsockopt = NULL,
 	.setsockopt = offload_setsockopt,
+	.sendmsg = offload_sendmsg,
+	.recvmsg = NULL,
+	.getpeername = NULL,
+	.getsockname = NULL,
 };
 
 static bool offload_is_supported(int family, int type, int proto)
@@ -1352,11 +1357,11 @@ int32_t mdm_ubxlib_bring_interface_up(const void *pCfg)
 	// uCellNetGetIpAddressStr(cellHandle, buffer);
 	// uCellNetGetApnStr(cellHandle, buffer, sizeof(buffer));
 
-	// if (mdata.connectedCallback != NULL) {
-	//	mdata.connectedCallback();
-	// }
-	return U_ERROR_COMMON_SUCCESS;
-}
+		// if (mdata.connectedCallback != NULL) {
+		//	mdata.connectedCallback();
+		// }
+		return U_ERROR_COMMON_SUCCESS;
+	}
 
 uint32_t mdm_ubxlib_interface_down(void)
 {
