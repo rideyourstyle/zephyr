@@ -484,8 +484,8 @@ static void modem_reset(void)
 	// uPortDeinit();
 
 	pin_init();
-	uPortInit();
 
+	uPortInit();
 	uDeviceInit();
 
 	int32_t retVal = uDeviceOpen(&gDeviceCfg, &mdata.cellHandle);
@@ -497,8 +497,9 @@ static void modem_reset(void)
 		// Switch AT printing off
 		// bool atPrintOn = uAtClientPrintAtGet(atHandle);
 		// LOG_INF("%d", atPrintOn);
-		uAtClientPrintAtSet(atHandle, false);
+		uAtClientPrintAtSet(atHandle, true);
 	}
+
 }
 
 void onSocketCloseCb(void *pCbData)
@@ -519,8 +520,6 @@ void onDataReceivedCb(void *pCbData)
  */
 static int create_socket(struct modem_socket *sock, const struct sockaddr *addr)
 {
-	int32_t retVal;
-
 	if (sock->ip_proto != IPPROTO_UDP && sock->ip_proto != IPPROTO_TCP) {
 		LOG_ERR("Not supported protocol %d", sock->ip_proto);
 		goto error;
@@ -529,7 +528,7 @@ static int create_socket(struct modem_socket *sock, const struct sockaddr *addr)
 	uSockType_t socketType =
 		U_SOCK_TYPE_STREAM ? sock->ip_proto == IPPROTO_TCP : U_SOCK_TYPE_DGRAM;
 
-	retVal = uSockCreate(mdata.cellHandle, socketType, sock->ip_proto);
+	const int32_t retVal = uSockCreate(mdata.cellHandle, socketType, sock->ip_proto);
 	if (retVal < 0) {
 		LOG_ERR("uSockCreate failed: %d", retVal);
 		goto error;
