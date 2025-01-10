@@ -67,6 +67,7 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 #include "ubxlib.h"
 
 #include <zephyr/drivers/modem/modem_ubxlib.h>
+#include <zephyr/net/offloaded_netdev.h>
 
 // pin settings
 #if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
@@ -152,7 +153,6 @@ struct modem_data {
 	struct modem_socket_config socket_config;
 	struct modem_socket sockets[MDM_MAX_SOCKETS];
 
-	//	connectedCallback connectedCallback;
 	networkStatusCallback networkStatusCallback;
 
 #if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
@@ -620,7 +620,7 @@ static int offload_close(void *obj)
 	LOG_WRN("offload_close: mdata.ubxSocketId: %d, sock->id: %d", mdata.ubxSocketId, sock->id);
 	k_sleep(K_MSEC(1));
 
-	/* make sure we assigned an id */
+	/* make sure socket is allocated and assigned an id */
 	if (modem_socket_id_is_assigned(&mdata.socket_config, sock) == false) {
 		return 0;
 	}
@@ -649,7 +649,8 @@ static int offload_close(void *obj)
 	return retVal;
 }
 
-static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrlen)
+static int offload_bind(void *obj, const struct sockaddr *addr,
+			socklen_t addrlen)
 {
 	struct modem_socket *sock = (struct modem_socket *)obj;
 
@@ -657,19 +658,22 @@ static int offload_bind(void *obj, const struct sockaddr *addr, socklen_t addrle
 	memcpy(&sock->src, addr, sizeof(*addr));
 
 	/* make sure we've created the socket */
-	// if (sock->id == mdata.socket_config.sockets_len + 1) {
-	if (create_socket(sock, addr) < 0) {
-		return -1;
+	if (modem_socket_is_allocated(&mdata.socket_config, sock) == true) {
+		if (create_socket(sock, addr) < 0) {
+			return -1;
+		}
 	}
-	//}
 
 	return 0;
 }
 
-static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t addrlen)
+static int offload_connect(void *obj, const struct sockaddr *addr,
+			   socklen_t addrlen)
 {
+	int retVal = 0;
 	struct modem_socket *sock = (struct modem_socket *)obj;
 	uSockAddress_t address = {0};
+
 
 	if (addr == NULL) {
 		LOG_ERR("offload_connect: addr == NULL");
@@ -679,10 +683,20 @@ static int offload_connect(void *obj, const struct sockaddr *addr, socklen_t add
 
 	LOG_INF("offload_connect sock->id: %d, mdata.ubxSocketId: %d", sock->id, mdata.ubxSocketId);
 
-	int retVal = create_socket(sock, NULL);
-	if (retVal != 0) {
-		LOG_ERR("offload_connect: create_socket returned with: %d", retVal);
+	/* make sure socket has been allocated */
+	if (modem_socket_is_allocated(&mdata.socket_config, sock) == false) {
+		LOG_ERR("Invalid socket_id(%d) from fd:%d",
+			sock->id, sock->sock_fd);
+		errno = EINVAL;
 		return -1;
+	}
+
+	/* make sure we've created the socket */
+	if (modem_socket_id_is_assigned(&mdata.socket_config, sock) == false) {
+		if (create_socket(sock, NULL) < 0) {
+			LOG_ERR("offload_connect: create_socket returned with: %d", retVal);
+			return -1;
+		}
 	}
 
 	memcpy(&sock->dst, addr, sizeof(*addr));
@@ -743,19 +757,23 @@ static ssize_t offload_recvfrom(void *obj, void *buf, size_t len, int flags, str
 		return -1;
 	}
 
-	if (flags & ZSOCK_MSG_DONTWAIT) {
-		// errno = EAGAIN;
-		return -1;
-	}
+//	next_packet_size = modem_socket_next_packet_size(&mdata.socket_config,
+//							 sock);
+//	if (!next_packet_size) {
+//		if (flags & ZSOCK_MSG_DONTWAIT) {
+//			errno = EAGAIN;
+//			return -1;
+//		}
 
 	if (!sock->is_connected && sock->ip_proto != IPPROTO_UDP) {
 		// errno = 0;
 		return 0;
 	}
 
-	// modem_socket_wait_data(&mdata.socket_config, sock);
-	// next_packet_size = modem_socket_next_packet_size(&mdata.socket_config, sock);
-	//}
+//		modem_socket_wait_data(&mdata.socket_config, sock);
+//		next_packet_size = modem_socket_next_packet_size(
+//			&mdata.socket_config, sock);
+//	}
 
 	/*
 	 * Binary and ASCII mode allows sending MDM_MAX_DATA_LENGTH bytes to
@@ -1038,27 +1056,23 @@ static int offload_setsockopt(void *obj, int level, int optname, const void *opt
 	return ret;
 }
 
+
 static const struct socket_op_vtable offload_socket_fd_op_vtable = {
-	.fd_vtable =
-		{
-			.read = offload_read,
-			.write = offload_write,
-			.close = offload_close,
-			.ioctl = offload_ioctl,
-		},
-	.shutdown = NULL,
+	.fd_vtable = {
+		.read = offload_read,
+		.write = offload_write,
+		.close = offload_close,
+		.ioctl = offload_ioctl,
+	},
 	.bind = offload_bind,
 	.connect = offload_connect,
-	.listen = NULL,
-	.accept = NULL,
 	.sendto = offload_sendto,
 	.recvfrom = offload_recvfrom,
+	.listen = NULL,
+	.accept = NULL,
+	.sendmsg = offload_sendmsg,
 	.getsockopt = NULL,
 	.setsockopt = offload_setsockopt,
-	.sendmsg = offload_sendmsg,
-	.recvmsg = NULL,
-	.getpeername = NULL,
-	.getsockname = NULL,
 };
 
 static bool offload_is_supported(int family, int type, int proto)
@@ -1172,8 +1186,7 @@ static struct net_offload modem_net_offload = {
 	.get = net_offload_dummy_get,
 };
 
-#define HASH_MULTIPLIER 37
-
+#define HASH_MULTIPLIER		37
 static uint32_t hash32(char *str, int len)
 {
 	uint32_t h = 0;
@@ -1211,7 +1224,9 @@ static void modem_net_iface_init(struct net_if *iface)
 
 	/* Direct socket offload used instead of net offload: */
 	iface->if_dev->offload = &modem_net_offload;
-	net_if_set_link_addr(iface, modem_get_mac(dev), sizeof(data->mac_addr), NET_LINK_ETHERNET);
+	net_if_set_link_addr(iface, modem_get_mac(dev),
+			     sizeof(data->mac_addr),
+			     NET_LINK_ETHERNET);
 	data->net_iface = iface;
 #ifdef CONFIG_DNS_RESOLVER
 	socket_offload_dns_register(&offload_dns_ops);
@@ -1220,8 +1235,8 @@ static void modem_net_iface_init(struct net_if *iface)
 	net_if_socket_offload_set(iface, offload_socket);
 }
 
-static struct net_if_api api_funcs = {
-	.init = modem_net_iface_init,
+static struct offloaded_if_api api_funcs = {
+	.iface_api.init = modem_net_iface_init,
 };
 
 static int modem_init(const struct device *dev)
@@ -1238,17 +1253,10 @@ static int modem_init(const struct device *dev)
 			   K_KERNEL_STACK_SIZEOF(modem_workq_stack), K_PRIO_COOP(7), NULL);
 #endif
 
-	/* socket config */
-	mdata.socket_config.sockets = &mdata.sockets[0];
-	mdata.socket_config.sockets_len = ARRAY_SIZE(mdata.sockets);
-	// mdata.socket_config.base_socket_num = MDM_BASE_SOCKET_NUM;
 	mdata.ubxSocketId = -1;
-
 	/* socket config */
 	ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0], ARRAY_SIZE(mdata.sockets),
 				MDM_BASE_SOCKET_NUM, false, &offload_socket_fd_op_vtable);
-
-	// ret = modem_socket_init(&mdata.socket_config, &offload_socket_fd_op_vtable);
 	if (ret < 0) {
 		LOG_ERR("Error modem_socket_init: %d", ret);
 		goto error;
