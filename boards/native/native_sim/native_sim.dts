@@ -27,12 +27,18 @@
 		zephyr,bt-hci = &bt_hci_userchan;
 	};
 
+	zephyr,user {
+		io-channels = <&adc0 0>, <&adc0 1>;
+	};
+
 	aliases {
 		eeprom-0 = &eeprom0;
 		i2c-0 = &i2c0;
 		spi-0 = &spi0;
 		led0 = &led0;
 		rtc = &rtc;
+		modem-uart = &uart1;
+		modem = &modem;
 	};
 
 	leds {
@@ -143,22 +149,27 @@
 		#size-cells = <0>;
 	};
 
-	uart0: uart {
+
+	uart0: uart0 {
 		status = "okay";
-		compatible = "zephyr,native-posix-uart";
-		/* Dummy current-speed entry to comply with serial
-		 * DTS binding
-		 */
-		current-speed = <0>;
+		compatible = "zephyr,native-tty-uart";
+		serial-port = "/dev/ttyUSB1";
+		current-speed = <115200>;
 	};
 
-	uart1: uart_1 {
+	// modem
+	uart1: uart1 {
 		status = "okay";
-		compatible = "zephyr,native-posix-uart";
-		/* Dummy current-speed entry to comply with serial
-		 * DTS binding
-		 */
-		current-speed = <0>;
+		compatible = "zephyr,native-tty-uart";
+		//hw-flow-control;
+		current-speed = <115200>;
+		serial-port = "/dev/ttyUSB2";
+
+		modem: modem {
+			compatible = "u-blox,sara-r5";
+			status = "okay";
+			//mdm-power-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
+		};
 	};
 
 	rng: rng {
@@ -171,7 +182,7 @@
 		compatible = "zephyr,native-posix-counter";
 	};
 
-	gpio0: gpio_emul {
+	gpio0: gpio0 {
 		status = "okay";
 		compatible = "zephyr,gpio-emul";
 		rising-edge;
@@ -221,6 +232,27 @@
 		nchannels = <2>;
 		#io-channel-cells = <1>;
 		status = "okay";
+
+		ref-internal-mv = <3300>;
+		ref-external1-mv = <5000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		channel@0 {
+			reg = <0>;
+			zephyr,gain = "ADC_GAIN_1";
+			zephyr,reference = "ADC_REF_INTERNAL";
+			zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+			zephyr,resolution = <10>;
+		};
+
+		channel@1 {
+			reg = <1>;
+			zephyr,gain = "ADC_GAIN_1";
+			zephyr,reference = "ADC_REF_INTERNAL";
+			zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+			zephyr,resolution = <10>;
+		};
 	};
 
 	dma: dma {
@@ -232,5 +264,83 @@
 	bt_hci_userchan: bt_hci_userchan {
 		compatible = "zephyr,bt-hci-userchan";
 		status = "okay";
+	};
+};
+
+
+&gpio0 {
+	ngpios = <16>;
+};
+
+/ {
+	buttons: gpio-keys0 {
+		compatible = "gpio-keys";
+		debounce-interval-ms = <30>;
+
+		do_vcc_aux_en: vcc_aux_en {
+			gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_sara_vcc: sara_vcc {
+			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+		};
+
+		do_sara_n_power: sara_n_power {
+			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_sara_reset: sara_reset {
+			gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+		};
+
+		do_gnss_reset: gnss_reset {
+			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_flash_n_hold: flash_n_hold {
+			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_flash_n_wp: flash_n_wp {
+			gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_flash_cs: flash_cs {
+			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_baro_cs: baro_cs {
+			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_spi_sck: spi_sck {
+			gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_spi_miso: spi_miso {
+			gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+		};
+
+		do_spi_mosi: spi_mosi {
+			gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
+		};
+
+		//        do_sara_tx: sara_tx {
+		//            gpios = <&gpioa 9 GPIO_ACTIVE_HIGH>;
+		//        };
+		//
+		//        do_sara_rx: sara_rx {
+		//            gpios = <&gpioa 10 GPIO_ACTIVE_HIGH>;
+		//        };
+		//
+		//        do_sara_cts: sara_cts {
+		//            gpios = <&gpioa 11 GPIO_ACTIVE_HIGH>;
+		//        };
+		//
+		//        do_sara_rts: sara_rts {
+		//            gpios = <&gpioa 12 GPIO_ACTIVE_HIGH>;
+		//        };
+
+
 	};
 };
