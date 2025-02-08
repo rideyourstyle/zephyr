@@ -24,18 +24,10 @@
 #include <zephyr/net/net_offload.h>
 #include <zephyr/net/socket_offload.h>
 
-#include <fcntl.h>
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-#include <stdio.h>
-#endif
+#include <zephyr/posix/fcntl.h>
 
 #include "modem_context.h"
 #include "modem_socket.h"
-
-#if !defined(CONFIG_MODEM_UBLOX_SARA_R4_MANUAL_MCCMNO)
-#define CONFIG_MODEM_UBLOX_SARA_R4_MANUAL_MCCMNO ""
-#endif
 
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
 #include "tls_internal.h"
@@ -43,9 +35,7 @@
 #include <zephyr/net/tls_credentials.h>
 #endif
 
-#define SARA_VCC_ID     DT_NODELABEL(do_sara_vcc)
-#define SARA_N_POWER_ID DT_NODELABEL(do_sara_n_power)
-#define SARA_RESET_ID   DT_NODELABEL(do_sara_reset)
+
 
 #define U_PORT_UART_MAX_NUM 1
 #define U_CFG_APP_CELL_UART 0
@@ -70,21 +60,10 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 #include <zephyr/net/offloaded_netdev.h>
 
 // pin settings
-#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
-static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_reset_gpios);
-#endif
-
-#if DT_INST_NODE_HAS_PROP(0, mdm_vcc_gpios)
-static const struct gpio_dt_spec vcc_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vcc_gpios);
-#endif
-
-#if DT_INST_NODE_HAS_PROP(0, mdm_power_on_gpios)
-static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_power_on_gpios);
-#endif
-
-#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
-static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
-#endif
+static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL( do_sara_reset ), gpios );
+static const struct gpio_dt_spec vcc_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL( do_sara_vcc ), gpios );
+static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL( do_sara_vcc ), gpios );
+//static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
 
 // #define MDM_UART_NODE DT_INST_BUS(0)
 // #define MDM_UART_DEV  DEVICE_DT_GET(MDM_UART_NODE)
@@ -118,18 +97,8 @@ static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_g
 #define MDM_IMSI_LENGTH         16
 #define MDM_APN_LENGTH          32
 #define MDM_MAX_CERT_LENGTH     8192
-// #if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-// #define MDM_VARIANT_UBLOX_R4 4
-// #define MDM_VARIANT_UBLOX_U2 2
-// #endif
 
 NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE, 0, NULL);
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-/* RX thread work queue */
-K_KERNEL_STACK_DEFINE(modem_workq_stack, CONFIG_MODEM_UBLOX_SARA_R4_RX_WORKQ_STACK_SIZE);
-static struct k_work_q modem_workq;
-#endif
 
 /* socket read callback data */
 struct socket_read_data {
@@ -155,11 +124,6 @@ struct modem_data {
 
 	networkStatusCallback networkStatusCallback;
 
-#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-	/* RSSI work */
-	struct k_work_delayable rssi_query_work;
-#endif
-
 	/* modem data */
 	char mdm_manufacturer[MDM_MANUFACTURER_LENGTH];
 	char mdm_model[MDM_MODEL_LENGTH];
@@ -167,15 +131,6 @@ struct modem_data {
 	char mdm_imei[MDM_IMEI_LENGTH];
 	char mdm_imsi[MDM_IMSI_LENGTH];
 	int mdm_rssi;
-
-#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_VARIANT)
-	/* modem variant */
-	int mdm_variant;
-#endif
-#if defined(CONFIG_MODEM_UBLOX_SARA_AUTODETECT_APN)
-	/* APN */
-	char mdm_apn[MDM_APN_LENGTH];
-#endif
 
 	/* modem state */
 	int ev_creg;
@@ -365,7 +320,7 @@ static int pin_init(void)
 	gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT);
 	gpio_pin_configure_dt(&vcc_gpio, GPIO_OUTPUT);
 	gpio_pin_configure_dt(&power_on_gpio, GPIO_OUTPUT);
-	gpio_pin_configure_dt(&vint_gpio, GPIO_INPUT);
+	//gpio_pin_configure_dt(&vint_gpio, GPIO_INPUT);
 
 	k_sleep(K_MSEC(1));
 
@@ -419,11 +374,9 @@ static int pin_init(void)
 	unsigned int irq_lock_key = irq_lock();
 
 	gpio_pin_set_dt(&power_on_gpio, 0);
-#if defined(CONFIG_MODEM_UBLOX_SARA_U2)
-	k_usleep(50); /* 50-80 microseconds */
-#else
+
 	k_sleep(K_SECONDS(1));
-#endif
+
 	gpio_pin_set_dt(&power_on_gpio, 1);
 
 	irq_unlock(irq_lock_key);
@@ -1247,13 +1200,8 @@ static int modem_init(const struct device *dev)
 	k_sem_init(&mdata.sem_response, 0, 1);
 	k_sem_init(&mdata.sem_prompt, 0, 1);
 
-#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-	/* initialize the work queue */
-	k_work_queue_start(&modem_workq, modem_workq_stack,
-			   K_KERNEL_STACK_SIZEOF(modem_workq_stack), K_PRIO_COOP(7), NULL);
-#endif
-
 	mdata.ubxSocketId = -1;
+
 	/* socket config */
 	ret = modem_socket_init(&mdata.socket_config, &mdata.sockets[0], ARRAY_SIZE(mdata.sockets),
 				MDM_BASE_SOCKET_NUM, false, &offload_socket_fd_op_vtable);
@@ -1276,11 +1224,6 @@ static int modem_init(const struct device *dev)
 		// goto error;
 	}
 
-#if defined(CONFIG_MODEM_UBLOX_SARA_RSSI_WORK)
-	/* init RSSI query */
-	k_work_init_delayable(&mdata.rssi_query_work, modem_rssi_query_work);
-#endif
-
 	modem_reset();
 
 error:
@@ -1289,7 +1232,7 @@ error:
 
 bool keepGoingCallback(uDeviceHandle_t cellHandle)
 {
-	UNUSED(cellHandle);
+	(void)cellHandle;
 	bool keepGoing = true;
 
 	if ((mdata.startTimeMs > 0) &&

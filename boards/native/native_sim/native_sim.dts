@@ -33,6 +33,9 @@
 		spi-0 = &spi0;
 		led0 = &led0;
 		rtc = &rtc;
+
+		modem-uart = &uart1;
+		modem = &modem;
 	};
 
 	leds {
@@ -232,6 +235,20 @@
 	bt_hci_userchan: bt_hci_userchan {
 		compatible = "zephyr,bt-hci-userchan";
 		status = "okay";
+	};
+
+	uart3: uart3 {
+		status = "okay";
+		compatible = "zephyr,native-tty-uart";
+		hw-flow-control;
+		current-speed = <115200>;
+		serial-port = "/dev/ttyUSB0";
+
+		modem: modem {
+			compatible = "u-blox,sara-r5";
+			status = "okay";
+			//mdm-power-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
+		};
 	};
 };
 
