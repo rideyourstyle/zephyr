@@ -8,34 +8,31 @@
 
 #define U_DEVICE_PRIVATE_I2C_MAX_NUM        0
 #define U_DEVICE_PRIVATE_DEVICE_I2C_MAX_NUM 0
+#define U_PORT_UART_MAX_NUM 1
 
-// #define U_CFG_OS_APP_TASK_PRIORITY	   4
-// #define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
-// #define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
+#define U_CFG_OS_APP_TASK_PRIORITY	   4
+#define U_AT_CLIENT_CALLBACK_TASK_PRIORITY 4
+#define U_CFG_OS_TIMER_EVENT_TASK_PRIORITY 1
 
+#include <zephyr/kernel.h>
 #include <ctype.h>
 #include <errno.h>
-
-#include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/device.h>
 #include <zephyr/init.h>
-#include <zephyr/kernel.h>
+#include <zephyr/posix/fcntl.h>
+
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_offload.h>
 #include <zephyr/net/socket_offload.h>
-
-#include <zephyr/posix/fcntl.h>
 
 #include "modem_context.h"
 #include "modem_socket.h"
 
 #if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
 #include "tls_internal.h"
-
 #include <zephyr/net/tls_credentials.h>
 #endif
-
-
 
 #define U_PORT_UART_MAX_NUM 1
 #define U_CFG_APP_CELL_UART 0
@@ -60,10 +57,28 @@ LOG_MODULE_REGISTER(ubx_wrapper);
 #include <zephyr/net/offloaded_netdev.h>
 
 // pin settings
+// pin settings
+#if DT_INST_NODE_HAS_PROP(0, mdm_reset_gpios)
+static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_reset_gpios);
+#endif
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_vcc_gpios)
+static const struct gpio_dt_spec vcc_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vcc_gpios);
+#endif
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_power_on_gpios)
+static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_power_on_gpios);
+#endif
+
+#if DT_INST_NODE_HAS_PROP(0, mdm_vint_gpios)
+static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
+#endif
+/*
 static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL( do_sara_reset ), gpios );
 static const struct gpio_dt_spec vcc_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL( do_sara_vcc ), gpios );
 static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL( do_sara_vcc ), gpios );
 //static const struct gpio_dt_spec vint_gpio = GPIO_DT_SPEC_INST_GET(0, mdm_vint_gpios);
+*/
 
 // #define MDM_UART_NODE DT_INST_BUS(0)
 // #define MDM_UART_DEV  DEVICE_DT_GET(MDM_UART_NODE)
@@ -80,8 +95,8 @@ static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL(
 #define MDM_PROMPT_CMD_DELAY     K_MSEC(50)
 
 #define MDM_MAX_DATA_LENGTH 1024
-#define MDM_RECV_MAX_BUF    30
-#define MDM_RECV_BUF_SIZE   128
+//#define MDM_RECV_MAX_BUF    30
+//#define MDM_RECV_BUF_SIZE   128
 
 #define MDM_MAX_SOCKETS     6
 #define MDM_BASE_SOCKET_NUM 0
@@ -98,7 +113,7 @@ static const struct gpio_dt_spec power_on_gpio = GPIO_DT_SPEC_GET( DT_NODELABEL(
 #define MDM_APN_LENGTH          32
 #define MDM_MAX_CERT_LENGTH     8192
 
-NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE, 0, NULL);
+//NET_BUF_POOL_DEFINE(mdm_recv_pool, MDM_RECV_MAX_BUF, MDM_RECV_BUF_SIZE, 0, NULL);
 
 /* socket read callback data */
 struct socket_read_data {

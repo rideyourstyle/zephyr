@@ -522,6 +522,11 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 {
 	char *stack_ptr;
 
+	if ( prio == 30 ) {
+		static int i = 0;
+		i++;
+	}
+
 	Z_ASSERT_VALID_PRIO(prio, entry);
 
 #ifdef CONFIG_THREAD_ABORT_NEED_CLEANUP

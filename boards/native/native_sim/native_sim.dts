@@ -34,8 +34,8 @@
 		led0 = &led0;
 		rtc = &rtc;
 
-		modem-uart = &uart1;
-		modem = &modem;
+//		modem-uart = &uart1;
+//		modem = &modem;
 	};
 
 	leds {
@@ -237,19 +237,19 @@
 		status = "okay";
 	};
 
-	uart3: uart3 {
-		status = "okay";
-		compatible = "zephyr,native-tty-uart";
-		hw-flow-control;
-		current-speed = <115200>;
-		serial-port = "/dev/ttyUSB0";
-
-		modem: modem {
-			compatible = "u-blox,sara-r5";
-			status = "okay";
-			//mdm-power-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
-		};
-	};
+//	uart3: uart3 {
+//		status = "okay";
+//		compatible = "zephyr,native-tty-uart";
+//		hw-flow-control;
+//		current-speed = <115200>;
+//		serial-port = "/dev/ttyUSB0";
+//
+//		modem: modem {
+//			compatible = "u-blox,sara-r5";
+//			status = "okay";
+//			//mdm-power-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
+//		};
+//	};
 };
 
 
