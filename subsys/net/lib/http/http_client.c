@@ -11,7 +11,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(net_http_client, CONFIG_NET_HTTP_LOG_LEVEL);
+LOG_MODULE_REGISTER(LOG_http_client);
 
 #include <zephyr/kernel.h>
 #include <string.h>
@@ -101,7 +101,7 @@ static int http_send_data(int sock, char *send_buf,
 
 				ret = sendall(sock, send_buf, end_of_send, req_end_timepoint);
 				if (ret < 0) {
-					NET_DBG("Cannot send %d bytes (%d)",
+					LOG_DBG("Cannot send %d bytes (%d)",
 						end_of_send, ret);
 					goto err;
 				}
@@ -123,7 +123,7 @@ static int http_send_data(int sock, char *send_buf,
 	va_end(va);
 
 	if (end_of_send > (int)send_buf_max_len) {
-		NET_ERR("Sending overflow (%d > %zd)", end_of_send,
+		LOG_ERR("Sending overflow (%d > %zd)", end_of_send,
 			send_buf_max_len);
 		return -EMSGSIZE;
 	}
@@ -155,7 +155,7 @@ static int http_flush_data(int sock, const char *send_buf, size_t send_buf_len,
 
 static void print_header_field(size_t len, const char *str)
 {
-	if (IS_ENABLED(CONFIG_NET_HTTP_LOG_LEVEL_DBG)) {
+	if (IS_ENABLED(CONFIG_LOG_HTTP_LOG_LEVEL_DBG)) {
 #define MAX_OUTPUT_LEN 128
 		char output[MAX_OUTPUT_LEN];
 
@@ -168,7 +168,7 @@ static void print_header_field(size_t len, const char *str)
 
 		snprintk(output, len + 1, "%s", str);
 
-		NET_DBG("[%zd] %s", len, output);
+		LOG_DBG("[%zd] %s", len, output);
 	}
 }
 
@@ -200,7 +200,7 @@ static int on_status(struct http_parser *parser, const char *at, size_t length)
 	req->internal.response.http_status_code =
 		(uint16_t)parser->status_code;
 
-	NET_DBG("HTTP response status %d %s", parser->status_code,
+	LOG_DBG("HTTP response status %d %s", parser->status_code,
 		req->internal.response.http_status);
 
 	if (req->internal.response.http_cb &&
@@ -284,7 +284,7 @@ static int on_body(struct http_parser *parser, const char *at, size_t length)
 	req->internal.response.body_found = 1;
 	req->internal.response.processed += length;
 
-	NET_DBG("Processed %zd length %zd", req->internal.response.processed,
+	LOG_DBG("Processed %zd length %zd", req->internal.response.processed,
 		length);
 
 	if (req->internal.response.http_cb &&
@@ -316,17 +316,17 @@ static int on_headers_complete(struct http_parser *parser)
 	}
 
 	if (parser->status_code >= 500 && parser->status_code < 600) {
-		NET_DBG("Status %d, skipping body", parser->status_code);
+		LOG_DBG("Status %d, skipping body", parser->status_code);
 		return 1;
 	}
 
 	if ((req->method == HTTP_HEAD || req->method == HTTP_OPTIONS) &&
 	    req->internal.response.content_length > 0) {
-		NET_DBG("No body expected");
+		LOG_DBG("No body expected");
 		return 1;
 	}
 
-	NET_DBG("Headers complete");
+	LOG_DBG("Headers complete");
 
 	return 0;
 }
@@ -342,7 +342,7 @@ static int on_message_begin(struct http_parser *parser)
 		req->internal.response.http_cb->on_message_begin(parser);
 	}
 
-	NET_DBG("-- HTTP %s response (headers) --",
+	LOG_DBG("-- HTTP %s response (headers) --",
 		http_method_str(req->method));
 
 	return 0;
@@ -359,7 +359,7 @@ static int on_message_complete(struct http_parser *parser)
 		req->internal.response.http_cb->on_message_complete(parser);
 	}
 
-	NET_DBG("-- HTTP %s response (complete) --",
+	LOG_DBG("-- HTTP %s response (complete) --",
 		http_method_str(req->method));
 
 	req->internal.response.message_complete = 1;
@@ -419,7 +419,7 @@ static void http_client_init_parser(struct http_parser *parser,
 static void http_report_null(struct http_request *req)
 {
 	if (req->internal.response.cb) {
-		NET_DBG("Calling callback for Final Data"
+		LOG_DBG("Calling callback for Final Data"
 			"(NULL HTTP response)");
 
 		/* Status code 0 representing a null response */
@@ -441,7 +441,7 @@ static void http_report_null(struct http_request *req)
 static void http_report_complete(struct http_request *req)
 {
 	if (req->internal.response.cb) {
-		NET_DBG("Calling callback for %zd len data", req->internal.response.data_len);
+		LOG_DBG("Calling callback for %zd len data", req->internal.response.data_len);
 		req->internal.response.cb(&req->internal.response, HTTP_DATA_FINAL,
 					  req->internal.user_data);
 	}
@@ -451,7 +451,7 @@ static void http_report_complete(struct http_request *req)
 static void http_report_progress(struct http_request *req)
 {
 	if (req->internal.response.cb) {
-		NET_DBG("Calling callback for partitioned %zd len data",
+		LOG_DBG("Calling callback for partitioned %zd len data",
 			req->internal.response.data_len);
 
 		req->internal.response.cb(&req->internal.response, HTTP_DATA_MORE,
@@ -741,7 +741,7 @@ int http_client_req(int sock, struct http_request *req,
 		total_sent += ret;
 	}
 
-	NET_DBG("Sent %d bytes", total_sent);
+	LOG_DBG("Sent %d bytes", total_sent);
 
 	http_client_init_parser(&req->internal.parser,
 				&req->internal.parser_settings);
@@ -749,12 +749,12 @@ int http_client_req(int sock, struct http_request *req,
 	/* Request is sent, now wait data to be received */
 	total_recv = http_wait_data(sock, req, req_end_timepoint);
 	if (total_recv < 0) {
-		NET_DBG("Wait data failure (%d)", total_recv);
+		LOG_DBG("Wait data failure (%d)", total_recv);
 		ret = total_recv;
 		goto out;
 	}
 
-	NET_DBG("Received %d bytes", total_recv);
+	LOG_DBG("Received %d bytes", total_recv);
 
 	return total_sent;
 
